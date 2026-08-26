@@ -84,6 +84,28 @@ local bags_answered = 0     -- bags get_bag_info answered about at all
 local swept = false
 local generation = 0
 
+--[[ The same distinction, for KEY items, and it did not exist until a gate
+     needed it.
+
+     get_key_items() is one call rather than seventeen, so the bag loop's
+     `read > 0` has no analogue here: the old code took whatever the pcall gave
+     it, installed `kis` -- EMPTY on failure -- and cleared `dirty_kis` anyway.
+     A refused call therefore read as "you hold no key items at all", and stayed
+     that way for the five-second rate limit.
+
+     That was survivable while key items only drove step inference, because
+     there a false negative leaves the ladder one rung back, and the README
+     already promises the position "can lag, and can never run ahead of you".
+     It is NOT survivable for a gate: `has_key_item` returning false would grey
+     a quest the player can walk in and start, on nothing but a transient
+     client refusal. That is the failure the bag path spends thirty lines of
+     comment refusing to commit, and the argument transfers whole.
+
+     So: `ki_swept` says the list installed above came from a call that actually
+     answered. Callers that must not turn ignorance into a definite no ask this
+     first, exactly as the entry gates ask `ready()`. ]]
+local ki_swept = false
+
 -- Injectable so tests can run without a game client.
 local api = {
     get_items = function(bag) return windower.ffxi.get_items(bag) end,
@@ -118,11 +140,17 @@ function inventory.reset()
     dirty_items, dirty_kis = true, true
     equipped, skipped_bags, bags_answered = {}, 0, 0
     swept = false
+    ki_swept = false
     generation = generation + 1
 end
 
 -- Has a real sweep ever happened? False means "unknown", not "empty".
 function inventory.ready() return swept end
+
+--[[ The same question for key items, which come from their own call and can
+     therefore be known when the bags are not, and vice versa. False means
+     "get_key_items() has never answered", never "you hold none". ]]
+function inventory.ki_ready() return ki_swept end
 
 -- Bumped once per actual sweep. Cache keys, not timestamps.
 function inventory.generation() return generation end
@@ -137,20 +165,31 @@ function inventory.refresh(force)
     if not want_items and not want_kis then return false end
 
     if want_kis then
-        local kis = {}
         local okk, list = pcall(api.get_key_items)
-        if okk and type(list) == 'table' then
+        local answered = okk and type(list) == 'table'
+        --[[ Install ONLY on a real answer. A refused call must leave the
+             previous list standing rather than replace it with an empty one:
+             stale is a worse answer than fresh, but it is a far better answer
+             than a confident, wrong "you hold nothing". `ki_swept` then says
+             which of the two a caller is looking at.
+
+             `dirty_kis` is cleared either way, deliberately. It is a rate
+             limiter, not a readiness flag, and leaving it set would re-sweep
+             on every single call for as long as the client keeps refusing. ]]
+        if answered then
+            local kis = {}
             for _, id in pairs(list) do
                 if type(id) == 'number' then kis[id] = true end
             end
+            key_items = kis
+            ki_swept = true
         end
-        key_items = kis
         dirty_kis = false
         --[[ The only moment the swept list and the 0x055 decode both exist, so
              the only place the bitfield's id stride can be checked against
              ground truth. See core/keyitems.lua -- it is information until it
              agrees, never before. ]]
-        if okk and type(list) == 'table' then
+        if answered then
             pcall(function() require('core/keyitems').verify(list) end)
         end
     end

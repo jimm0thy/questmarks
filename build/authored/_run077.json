@@ -28,7 +28,8 @@
   "confidence": "high",
   "review_flags": [
    "fame_gate_unmodelled",
-   "rank_gate_unmodelled"
+   "rank_gate_unmodelled",
+   "human_corrected"
   ],
   "notes": "Three bullets, three rungs, the same shape as its predecessor Hypnotic Hospitality. Bullet 2 is not a step -- it is the shopping list, with a sub-bullet per item saying where that item comes from -- so the fetching is split out ahead of the trade as an obtain, because holding all three at once is the only observable thing this quest offers. The three Mog Garden facilities the page names (Coastal Fishing Net, Pond Dredger, Mineral Vein) all resolve as real entities, but every one of them is offered with an off-Garden alternative on the same line: the Repeat Login Campaign for the calamary, the Auction House for the comet and for the stone. So no single object is the target of the obtain and no single zone is right for it, and it deliberately carries neither -- unlike Hypnotic Hospitality, where the Garden was at least mostly true.\n\nBullet 1's real gate is Rank 7 in every geological section of the Garden -- the MHMU treatise bought for every section except monster rearing -- which nothing in the packets reports. Fame 'Other' is not one of the nine regions and gates nothing, so only the raw survives. The Straw Hat is the reward and so is not evidence. The page gives no grid ref anywhere in the Mog Garden.",
   "gates": {
@@ -48,7 +49,24 @@
    "level": null,
    "jobs": [],
    "repeatable": false,
-   "expansion": null
+   "expansion": null,
+   "ki": [
+    {
+     "name": "\"MHMU Treatise on Agronomy\""
+    },
+    {
+     "name": "\"MHMU Treatise on Forestry\""
+    },
+    {
+     "name": "\"MHMU Treatise on Minerals\""
+    },
+    {
+     "name": "\"MHMU Treatise on Fish I\""
+    },
+    {
+     "name": "\"MHMU Treatise on Fish II\""
+    }
+   ]
   },
   "start": {
    "npc": "Green Thumb Moogle",
@@ -158,7 +176,22 @@
     ],
     "note": "all three in one trade, as the page insists"
    }
-  ]
+  ],
+  "human": {
+   "edited_at": "2026-08-23T14:25:35Z",
+   "by": "gate-review",
+   "basis": "reading",
+   "reason": "gates.ki added: rank 7 in all five geological sections, which the page itself defines as holding the five MHMU treatises. The requirement is the leading subordinate clause of walkthrough bullet 1 governing the start action itself ('Once you have achieved Rank 7 in all geological locations ... zone into your Mog Garden and talk to your Green Thumb Moogle'), and the same bullet glosses it to the key items: '(that is, you have bought the MHMU treatises for all sections of your Mog Garden except monster rearing)'. That is a precondition for starting, not the Hide and Go Peak shape, which was a sub-bullet naming a route to an object. Corroborated independently by the successor page: Glittering Gals' own |Quest Reqs= reads 'Completed Titillating Tomes (Must have level 7 in all Geological Locations.)'. The five names are resolved from res, not imported: each geological ladder in res/key_items.lua is exactly six books (2412-2417, 2419-2424, 2426-2431, 2433-2438, 2440-2445; 2418/2425/2432/2439/2446 do not exist), so the MHMU treatise is provably the top rung, rank 7.",
+   "fields": [
+    "gates.ki",
+    "review_flags[3]"
+   ],
+   "source_at_edit": {
+    "revision_id": 773999,
+    "source_sha256": "a0d3a56a59787441831fb4ab412c01988c4cfdea666f5eb82829339702a86241"
+   },
+   "history": []
+  }
  },
  {
   "schema": "questmarks-authoring/1",

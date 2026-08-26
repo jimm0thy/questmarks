@@ -261,6 +261,73 @@ function prereq.evaluate(entry)
         end
     end
 
+    --[[ --- the key-item START gate ------------------------------------------
+
+         "You cannot BEGIN this without holding X." Distinct from everything in
+         the block below, which asks what you must be holding to perform step 1;
+         this asks what you must already have earned to be offered the quest at
+         all. `Unsullied Lands` states `Quest Reqs: "Watercrafting"` in its own
+         header, and the moment you can reach the Ergon Locus is the moment the
+         quest exists for you.
+
+         An AND-list, like `craft` and unlike `jobs`. `Release the Fleece` names
+         five books and wants all five.
+
+         It can only ever gate a quest you have NOT started, and that is
+         structural rather than a promise: `marker_state` returns on `done` and
+         on `in_progress` well before it reaches `evaluate`, so this block is
+         only consulted under `-- available`. That matters because several of
+         these key items are SPENT during their own quest -- a gate that could
+         fire mid-quest would grey a quest you are standing in the middle of.
+
+         A DEFINITE FALSE is allowed here, and the reason is the one the craft
+         SKILL branch is refused it. A skill level can be borrowed from gear
+         invisibly, so a shortfall is not evidence you cannot start. A key item
+         cannot be borrowed, lent, or added to by equipment: you hold it or you
+         do not, `windower.ffxi.get_key_items()` answers exactly that, and there
+         is no count to get wrong. This is the job gate's shape, not the skill
+         gate's.
+
+         `ki_ready()` FIRST, and snapshot it before asking, for the same reason
+         the hand-over gate below snapshots `ready()`: `has_key_item` re-sweeps
+         when the cache is dirty, so asking readiness afterwards can never see
+         false, and getting the answer would destroy the evidence that we had
+         not had one. Before the first successful `get_key_items()` this reads
+         `nil` -- a black "!" that says "not looked yet" -- and never `false`,
+         which would grey a quest the player can walk in and start.
+
+         The loop still RUNS when `read` is false, and is not skipped as dead
+         work: `has_key_item` refreshes a dirty cache, so asking warms it for
+         every entry evaluated after this one. Same trade as the hand-over gate,
+         and the cost is the same one -- the first entry on a cold cache reads
+         black until the next scan tick. ]]
+    if entry.ki and #entry.ki > 0 then
+        local read = inventory.ki_ready()
+        local missing, first = 0, nil
+        for _, k in ipairs(entry.ki) do
+            if not inventory.has_key_item(k.rid) then
+                missing = missing + 1
+                first = first or (k.nm or ('key item ' .. tostring(k.rid)))
+            end
+        end
+        local label = entry.ki[1].nm or ('key item ' .. tostring(entry.ki[1].rid))
+        local what = (#entry.ki == 1) and label
+                      or ('%s and %d more'):format(label, #entry.ki - 1)
+        if not read then
+            add(nil, ('cannot be started without %s; your key items have not '
+                .. 'been read yet'):format(what))
+        elseif missing == 0 then
+            add(true, ('cannot be started without %s, and you have %s')
+                :format(what, (#entry.ki == 1) and 'it' or 'all of them'))
+        elseif #entry.ki == 1 then
+            add(false, ('cannot be STARTED without %s -- you do not have it')
+                :format(label))
+        else
+            add(false, ('cannot be STARTED without %s -- you are missing %d of '
+                .. '%d, including %s'):format(what, missing, #entry.ki, first))
+        end
+    end
+
     --[[ --- entry conditions: what you must already BE ----------------------
 
          Requirements do not normally gate availability, and that rule is

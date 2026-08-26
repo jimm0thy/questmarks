@@ -174,6 +174,48 @@ def schema_check(q):
                                            "by validate.py and the gate would "
                                            "silently stop existing"))
 
+        #[[ `ki` -- the key-item START gate. Optional, a LIST, and for the same
+        #   reason as `craft`: this project has twice lost a gate to a key name
+        #   that one side of the pipe used and the other did not.
+        #
+        #   The NAME check is the load-bearing one. Six Adoulin survival skills
+        #   have two literal `"` characters INSIDE their own names, and
+        #   normalize.lua strips quotes and never adds them. So `"Watercrafting"`
+        #   resolves to ki 2205, a tidied `Watercrafting` resolves to nothing at
+        #   all, and the unquoted `watercraft` is a DIFFERENT key item -- 2167,
+        #   the boat the skill lets you use. Tidying the quotes away therefore
+        #   does not fail loudly; it can gate on the wrong object. Refused here
+        #   rather than left to validate.py, which can only drop it. ]]
+        ki = g.get("ki")
+        if ki is not None:
+            if not isinstance(ki, list):
+                out.append(Problem("error", "gates.ki",
+                                   "gates.ki must be a LIST (it is an AND-list "
+                                   "of key items you must already hold); a "
+                                   "scalar is the shape that made every job "
+                                   "gate vanish"))
+            else:
+                for i, k in enumerate(ki):
+                    w = "gates.ki[%d]" % i
+                    if not isinstance(k, dict):
+                        out.append(Problem("error", w, "each key-item gate must "
+                                                       "be an object"))
+                        continue
+                    nm = k.get("name")
+                    if not nm or not str(nm).strip():
+                        out.append(Problem("error", w + ".name",
+                                           "a key-item gate must name a key "
+                                           "item"))
+                        continue
+                    if str(nm).strip().lower() == "watercraft":
+                        out.append(Problem("error", w + ".name",
+                                           "`watercraft` is key item 2167, the "
+                                           "BOAT. The survival skill that gates "
+                                           "quests is '\"Watercrafting\"' (2205) "
+                                           "and its name includes the quote "
+                                           "characters. A quest can need both; "
+                                           "say which you mean."))
+
     steps = q.get("steps")
     if not isinstance(steps, list):
         out.append(Problem("error", "steps", "steps must be a list"))

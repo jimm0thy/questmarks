@@ -784,6 +784,90 @@ def test_worklist_guard():
         shutil.rmtree(root, ignore_errors=True)
 
 
+def test_key_item_start_gate():
+    section("gates.ki -- the key-item START gate, end to end through validate.py")
+
+    #[[ THE POINT OF THIS TEST is not that the gate works. It is that the FIELD
+    #   SURVIVES THE PIPE. This project has lost a gate to a key-name mismatch
+    #   twice: `gates.job` for `gates.jobs`, which vanished for a whole
+    #   extraction pass with no error raised, and `gates.prev`, which the
+    #   emitter still drops. Nothing checks the two sides of the pipe against
+    #   each other except a test like this one. ]]
+    q = a_quest(("quest", "adoulin", 12))
+    q["gates"]["ki"] = [{"name": '"Watercrafting"'}]
+    problems, row, _q = gates.gate_check(q)
+    check("a quoted survival skill resolves to its key item id",
+          row and row.get("ki") == [{"rid": 2205, "nm": '"Watercrafting"'}],
+          str(row and row.get("ki")))
+    check("...and the shape passes the editor's schema check",
+          not [p for p in problems if p.level == "error"
+               and p.where.startswith("gates.ki")],
+          "no schema error")
+
+    #[[ THE TRAP, asserted so nobody tidies the quotes away. res/key_items.lua
+    #   holds the six Adoulin survival skills WITH two literal quote characters
+    #   in their names, and normalize.lua strips quotes but never adds them. ]]
+    q2 = a_quest(("quest", "adoulin", 12))
+    q2["gates"]["ki"] = [{"name": "Watercrafting"}]
+    _p2, row2, _ = gates.gate_check(q2)
+    check("the SAME name without its quotes resolves to nothing",
+          row2 and row2.get("ki") == [], str(row2 and row2.get("ki")))
+    #[[ Dropped, not approximated, and that direction is the invariant: a gate
+    #   built on a name that did not resolve would grey a marker on our own
+    #   data being broken. Bad data may move a marker, never delete one. ]]
+    check("...and it is DROPPED rather than guessed at, leaving the marker alone",
+          row2 and "ki_gate_unresolved" in (row2.get("flags") or []),
+          str(row2 and row2.get("flags")))
+
+    #[[ And the reason the trap is dangerous rather than merely annoying:
+    #   the un-quoted spelling is a REAL key item, a different one. 2167 is the
+    #   boat; 2205 is the survival skill that lets you use it. A quest can need
+    #   both. Refused at the editor so it cannot be authored by accident. ]]
+    q3 = a_quest(("quest", "adoulin", 12))
+    q3["gates"]["ki"] = [{"name": "watercraft"}]
+    p3 = gates.schema_check(q3)
+    check("`watercraft` (the boat, 2167) is refused as a survival-skill gate",
+          [p for p in p3 if p.level == "error" and "2167" in p.text],
+          "the boat is not the skill")
+
+    #[[ An AND-list, and it must stay a list the whole way down. A scalar is the
+    #   exact shape that made every job gate vanish. ]]
+    q4 = a_quest(("quest", "other", 201))
+    q4["gates"]["ki"] = {"name": '"Watercrafting"'}
+    p4 = gates.schema_check(q4)
+    check("a scalar gates.ki is refused, not silently dropped",
+          [p for p in p4 if p.level == "error" and p.where == "gates.ki"],
+          "the jobs/job incident, prevented")
+
+    q5 = a_quest(("quest", "other", 201))
+    q5["gates"]["ki"] = [{"name": '"Fields And Fertilizing"'},
+                         {"name": '"Grandiloquent Groves"'},
+                         {"name": '"Varicose Mineral Veins"'},
+                         {"name": "\"Dredging's No Drudgery\""},
+                         {"name": '"Black Fish of the Family"'}]
+    _p5, row5, _ = gates.gate_check(q5)
+    check("all five Mog Garden rank books resolve, in order",
+          row5 and [k["rid"] for k in (row5.get("ki") or [])]
+                   == [2414, 2421, 2428, 2435, 2442],
+          str(row5 and [k["rid"] for k in (row5.get("ki") or [])]))
+
+    #[[ A repeat is a reading error, not an AND of a thing with itself. Deduped
+    #   so `//qm why` cannot say the same sentence to a player twice. ]]
+    q6 = a_quest(("quest", "adoulin", 12))
+    q6["gates"]["ki"] = [{"name": '"Watercrafting"'}, {"name": '"Watercrafting"'}]
+    _p6, row6, _ = gates.gate_check(q6)
+    check("a key item named twice is emitted once",
+          row6 and len(row6.get("ki") or []) == 1,
+          str(row6 and row6.get("ki")))
+
+    #[[ Absence must stay absence. Every quest in the corpus carries the key
+    #   with an empty list today, and that must not become a gate. ]]
+    q7 = a_quest()
+    _p7, row7, _ = gates.gate_check(q7)
+    check("a quest with no gates.ki emits an empty list, never a gate",
+          row7 and row7.get("ki") == [], str(row7 and row7.get("ki")))
+
+
 def main():
     print("=== questgraph ===")
     test_roundtrip_real_corpus()
@@ -802,6 +886,7 @@ def main():
     test_resolver_pins()
     test_grounding_exempts_in_game_corrections()
     test_worklist_guard()
+    test_key_item_start_gate()
     print("\n%d passed, %d failed" % (PASS[0], len(FAIL)))
     for f in FAIL:
         print("   FAILED: %s" % f)

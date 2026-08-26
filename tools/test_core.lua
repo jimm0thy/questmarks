@@ -333,6 +333,52 @@ check('empty reqs satisfied', (inventory.satisfies{}) == true)
           select(1, inventory.stats()) == 0,
           tostring(select(1, inventory.stats())))
 
+    --[[ The KEY ITEM half of exactly the same argument.
+
+         get_key_items() is a single call, so there is no bag loop to count
+         successes: the refusal has to be caught at the call itself. Before this
+         was asserted, a thrown get_key_items() installed an EMPTY list and
+         cleared the dirty flag, so "the client refused" became "you hold none"
+         and stayed that way for the rate limit. That is survivable for step
+         inference, where a false negative only leaves the ladder a rung back,
+         and NOT survivable for a gate, which would grey a quest on it. ]]
+    check('before any sweep, ki_ready() is false too',
+          inventory.ki_ready() == false, tostring(inventory.ki_ready()))
+    check('a get_key_items() that threw still reports "not read"',
+          inventory.ki_ready() == false, tostring(inventory.ki_ready()))
+
+    --[[ And it must not have destroyed a good list to say so. Answer once,
+         then start refusing, and the previously-read key item must survive:
+         stale beats a confident wrong "you hold nothing". ]]
+    local ki_alive = true
+    inventory.set_api{
+        get_items = dead, get_bag_info = dead,
+        clock = function() return 0 end,
+        get_key_items = function()
+            if not ki_alive then error('client not ready') end
+            return {2205}
+        end,
+    }
+    inventory.reset()
+    inventory.refresh(true)
+    check('a get_key_items() that answered sets ki_ready()',
+          inventory.ki_ready() == true, tostring(inventory.ki_ready()))
+    check('...and the key item it named is held',
+          inventory.has_key_item(2205) == true,
+          tostring(inventory.has_key_item(2205)))
+    ki_alive = false
+    inventory.refresh(true)
+    check('a later refusal does NOT wipe the key items already read',
+          inventory.has_key_item(2205) == true,
+          tostring(inventory.has_key_item(2205)))
+    check('...and ki_ready() stays true, because a good list is still installed',
+          inventory.ki_ready() == true, tostring(inventory.ki_ready()))
+
+    inventory.set_api{get_items = dead, get_bag_info = dead,
+                      get_key_items = dead, clock = function() return 0 end}
+    inventory.reset()
+    inventory.refresh(true)
+
     local function s1e(k, eq)
         return {cat = 'quest', area = 'sandoria', id = 999, snpc = 'giver',
                 steps = {{k = k, npc = 'giver', reqs = {{kind = 'item',
@@ -3411,6 +3457,99 @@ pskills.handle_chunk(chunk({[FISH] = {rank = 8}}))
 pskills.handle_currency(currency{[FISH] = 95000})
 check('...and ready only with both', select(1, prereq.evaluate(gp)) == 'ready')
 
+print('\n=== the key-item START gate ===')
+--[[ The shape is the JOB gate's, not the craft-SKILL gate's, and the difference
+     is a fact about the game. A skill level can be borrowed from equipment
+     invisibly, so a shortfall there is not evidence and must read nil. A key
+     item cannot be borrowed, lent or added to by gear: get_key_items() answers
+     a set, so a miss is a definite false and may grey. ]]
+;(function()
+    local WC = 2205                     -- '"Watercrafting"', quotes included
+    local CL = 2388                     -- '"Climbing"'
+    local one = {cat = 'quest', area = 'adoulin', id = 999994,
+                 ki = {{rid = WC, nm = '"Watercrafting"'}},
+                 steps = {{k = 'talk', npc = 'nobody'}}}
+
+    --[[ Cold: get_key_items() has never answered. This must be UNVERIFIABLE.
+         Reading it as blocked would grey a quest for every player in the first
+         moments after a load, which is the failure the bag sweep's `ready()`
+         spends thirty lines of comment refusing. ]]
+    inventory.set_api{get_key_items = function() error('client not ready') end}
+    inventory.reset()
+    check('with no key-item answer the gate is UNVERIFIABLE, never blocked',
+          select(1, prereq.evaluate(one)) == 'unverifiable',
+          tostring(select(1, prereq.evaluate(one))))
+
+    inventory.set_api{
+        get_key_items = function()
+            local out = {}
+            for id in pairs(held_kis) do out[#out + 1] = id end
+            return out
+        end,
+    }
+    --[[ refresh(true) stands in for the runtime's scan tick. On a COLD cache
+         the first evaluate reads `unverifiable` by design -- evaluate snapshots
+         ki_ready() before has_key_item() can warm it, exactly as the hand-over
+         gate below snapshots ready(). That trade is asserted above with a
+         throwing client; here we want the warm answer. ]]
+    held_kis = {}
+    inventory.reset(); inventory.refresh(true)
+    local st1, why1 = prereq.evaluate(one)
+    local named = false
+    for _, w in ipairs(why1) do
+        if w.ok == false and tostring(w.text):find('Watercrafting', 1, true) then
+            named = true
+        end
+    end
+    check('not holding it is BLOCKED, a definite false', st1 == 'blocked',
+          tostring(st1))
+    --[[ The reason must name the key item in the words the player's own menu
+         uses. "key item 2205" is not an explanation, which is why `nm` is
+         resolved at build time and carried in the index. ]]
+    check('...and the reason names the key item, quotes and all', named,
+          why1[1] and tostring(why1[1].text))
+
+    held_kis = {[WC] = true}
+    inventory.reset(); inventory.refresh(true)
+    check('holding it is READY', select(1, prereq.evaluate(one)) == 'ready',
+          tostring(select(1, prereq.evaluate(one))))
+
+    --[[ AND, not OR -- `craft` is the precedent to copy here and `jobs` is the
+         one that would invert it. `Release the Fleece` names five books and
+         wants all five, so one held must never rescue one missing. ]]
+    local two = {cat = 'quest', area = 'adoulin', id = 999993,
+                 ki = {{rid = WC, nm = '"Watercrafting"'},
+                       {rid = CL, nm = '"Climbing"'}},
+                 steps = {{k = 'talk', npc = 'nobody'}}}
+    held_kis = {[WC] = true}
+    inventory.reset(); inventory.refresh(true)
+    check('a key-item list is an AND -- one held and one missing is blocked',
+          select(1, prereq.evaluate(two)) == 'blocked',
+          tostring(select(1, prereq.evaluate(two))))
+    held_kis = {[WC] = true, [CL] = true}
+    inventory.reset(); inventory.refresh(true)
+    check('...and ready only when every key item named is held',
+          select(1, prereq.evaluate(two)) == 'ready',
+          tostring(select(1, prereq.evaluate(two))))
+
+    --[[ The count in the message is over the whole list, not the missing half,
+         so a player can tell "missing 1 of 2" from "missing 2 of 2". ]]
+    held_kis = {}
+    inventory.reset(); inventory.refresh(true)
+    local _, why2 = prereq.evaluate(two)
+    local counted = false
+    for _, w in ipairs(why2) do
+        if w.ok == false and tostring(w.text):find('missing 2 of 2') then
+            counted = true
+        end
+    end
+    check('...and the reason counts how many of how many are missing', counted,
+          why2[1] and tostring(why2[1].text))
+
+    held_kis = {}
+    inventory.reset()
+end)()
+
 print('\n=== Indomitable Spirit: the false yellow this removes ===')
 ;(function()
     state.reset(); fame.reset(); steps.reset(); inventory.reset()
@@ -3522,6 +3661,84 @@ print('\n=== Indomitable Spirit: the false yellow this removes ===')
     check('Inside the Belly carries NO craft gate, deliberately',
           itb ~= nil and (itb.craft == nil or #itb.craft == 0),
           itb and itb.craft and ('%d gate(s)'):format(#itb.craft) or 'none')
+
+    state.reset(); inventory.reset()
+end)()
+
+print('\n=== the shipped key-item gates, and the blast radius they buy ===')
+--[[ Asserted against the SHIPPED index rather than a fixture, for the reason
+     the craft block above is: a gate that resolves in a unit test and is then
+     dropped somewhere between build/authored and quest_index.lua has silently
+     stopped existing. This project has lost a gate to a key-name mismatch on
+     the two sides of the pipe TWICE -- `gates.job` for `gates.jobs`, and
+     `gates.prev`, which the emitter still drops -- and nothing but an assertion
+     like this one notices. ]]
+;(function()
+    state.reset(); fame.reset(); steps.reset(); inventory.reset()
+    assert(quests.load(qm_dir .. 'data/quest_index.lua'))
+
+    local by_key = {}
+    quests.each_entry(function(k, e) by_key[k] = e end)
+
+    local function ids_of(key)
+        local e = by_key[key]
+        if not (e and e.ki) then return nil end
+        local out = {}
+        for _, k in ipairs(e.ki) do out[#out + 1] = k.rid end
+        return table.concat(out, ',')
+    end
+
+    check('Release the Fleece carries all five Mog Garden rank-4 books',
+          ids_of('quest/other/201') == '2414,2421,2428,2435,2442',
+          tostring(ids_of('quest/other/201')))
+    check('Titillating Tomes carries all five MHMU treatises (rank 7)',
+          ids_of('quest/other/200') == '2417,2424,2431,2438,2445',
+          tostring(ids_of('quest/other/200')))
+    check('Voidwatch Ops: Border Crossing carries the Adventurer\'s Certificate',
+          ids_of('quest/outlands/100') == '35',
+          tostring(ids_of('quest/outlands/100')))
+
+    --[[ The display name has to survive too, quotes and all. This gate greys a
+         marker, so `//qm why` must be able to say `"Fields And Fertilizing"`
+         and not `key item 2414` -- and the name legitimately contains two
+         literal double-quote characters. A build that tidied them away would
+         still resolve (the id is already resolved by then) and would only show
+         up here. ]]
+    local fleece = by_key['quest/other/201']
+    check('...and the display names keep their literal quote characters',
+          fleece and fleece.ki and fleece.ki[1].nm == '"Fields And Fertilizing"',
+          fleece and fleece.ki and tostring(fleece.ki[1].nm))
+
+    --[[ BLAST RADIUS, bounded and counted like the craft gate's.
+
+         Every key-item gate CAN grey a marker -- unlike a craft skill level,
+         a key item cannot be borrowed from equipment, so the false branch is
+         allowed. That makes the count the thing to watch: if it grows without
+         a session saying why, something has authored a gate quietly. ]]
+    local n_q, n_g = 0, 0
+    quests.each_entry(function(_, e)
+        if e.ki and #e.ki > 0 then n_q = n_q + 1; n_g = n_g + #e.ki end
+    end)
+    check('exactly 3 quests carry a key-item gate, 11 key items in total',
+          n_q == 3 and n_g == 11, ('%d quest(s), %d key item(s)'):format(n_q, n_g))
+
+    --[[ The ones deliberately NOT gated, asserted so a later pass has to come
+         here and argue rather than just adding them.
+
+         other/207 Rowing Together and other/204 Chacharoon's Cheer both name a
+         Sakura book in |Quest Reqs=, and both were REFUSED: for 207 the
+         un-started marker sits on Zenicca, who SELLS the book, so gating it is
+         the Indomitable Spirit failure verbatim; for 204 the same reasoning
+         applies to its siblings and |Quest Reqs= is not a field this project
+         reads (AUTHORING, 'Input': Item Reqs is in the list, Quest Reqs is not).
+         adoulin/32 Water, Water, Everywhere names "Climbing" in the same field,
+         and there the page puts it on two of the three ???, i.e. AFTER the
+         quest is accepted. ]]
+    for _, key in ipairs({'quest/other/207', 'quest/other/204',
+                          'quest/adoulin/32', 'quest/adoulin/12'}) do
+        check(('%s carries NO key-item gate, deliberately'):format(key),
+              ids_of(key) == nil, tostring(ids_of(key)))
+    end
 
     state.reset(); inventory.reset()
 end)()

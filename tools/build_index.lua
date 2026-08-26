@@ -2043,6 +2043,28 @@ function M.build(opts)
                     end
                     parts[#parts + 1] = 'craft={' .. table.concat(cs, ',') .. '}'
                 end
+                --[[ The key-item START gate, carried through verbatim from
+                     quest_steps.lua. `rid` is a res/key_items.lua id and `nm`
+                     is its display name, resolved at build time because
+                     core/prereq.lua may not read res/ at runtime.
+
+                     Emitted under its own key rather than folded into the
+                     row's `reqs`. `reqs` is the computed UNION of this quest's
+                     step requirements -- what you must hold to PERFORM a step,
+                     including key items the quest itself hands you -- and the
+                     runtime only consults it on a quest that begins by handing
+                     something over. A start gate is a different question with a
+                     different answer, and merging them would gate on items the
+                     quest gives you. ]]
+                if L.ki and #L.ki > 0 then
+                    local ks = {}
+                    for _, k in ipairs(L.ki) do
+                        local f = {'rid=' .. lua_val(k.rid)}
+                        if k.nm then f[#f + 1] = 'nm=' .. lua_str(k.nm) end
+                        ks[#ks + 1] = '{' .. table.concat(f, ',') .. '}'
+                    end
+                    parts[#parts + 1] = 'ki={' .. table.concat(ks, ',') .. '}'
+                end
                 local ss = {}
                 for _, s in ipairs(L.steps) do
                     local sp = {'k=' .. lua_str(s.k)}

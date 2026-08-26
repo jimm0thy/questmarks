@@ -198,6 +198,90 @@ check('all 28 frozen bitfield sub-types still decode a set bit',
     state.reset()
 end)()
 
+--[[ The Mog Garden alias: quest/other 1039..1049 are answered out of the
+     ADOULIN blob at id - 1000. See the long note in core/state.lua.
+
+     Asserted by BEHAVIOUR and driven off a frozen literal pair list, never off
+     the table in state.lua -- reading the mapping out of the thing under test
+     is what makes an assertion that cannot fail. The ids are written out here
+     so that deleting one from state.lua fails here rather than passing
+     silently. ]]
+;(function()
+    local FROZEN_ALIAS = {
+        {1039, 39}, {1040, 40}, {1041, 41}, {1042, 42}, {1043, 43},
+        {1044, 44}, {1045, 45}, {1047, 47}, {1048, 48}, {1049, 49},
+    }
+    check('the frozen Mog Garden alias is still the ten quests',
+          #FROZEN_ALIAS == 10, ('%d frozen'):format(#FROZEN_ALIAS))
+
+    local bad_done, bad_cur, bad_clear = {}, {}, {}
+    for _, pair in ipairs(FROZEN_ALIAS) do
+        local other_id, adoulin_bit = pair[1], pair[2]
+
+        -- A set bit in the ADOULIN completed blob answers the OTHER id.
+        state.reset()
+        state.handle_packet{Type = 0x00F8, ['Quest Flags'] = blob{adoulin_bit}}
+        if state.is_completed('quest', 'other', other_id) ~= true then
+            bad_done[#bad_done + 1] = tostring(other_id)
+        end
+
+        -- and the same for `current`, which routes through 0x00F0.
+        state.reset()
+        state.handle_packet{Type = 0x00F0, ['Quest Flags'] = blob{adoulin_bit}}
+        if state.is_current('quest', 'other', other_id) ~= true then
+            bad_cur[#bad_cur + 1] = tostring(other_id)
+        end
+
+        --[[ And the direction that matters more: a blob that arrives with the
+             bit CLEAR must read a definite false, not nil. nil would delete the
+             marker instead of drawing it. ]]
+        state.reset()
+        state.handle_packet{Type = 0x00F8, ['Quest Flags'] = blob{0}}
+        if state.is_completed('quest', 'other', other_id) ~= false then
+            bad_clear[#bad_clear + 1] = tostring(other_id)
+        end
+    end
+    check('all ten Mog Garden ids read completed out of the adoulin blob',
+          #bad_done == 0, table.concat(bad_done, ' '))
+    check('all ten Mog Garden ids read current out of the adoulin blob',
+          #bad_cur == 0, table.concat(bad_cur, ' '))
+    check('a clear adoulin bit is a definite false for all ten, never nil',
+          #bad_clear == 0, table.concat(bad_clear, ' '))
+
+    --[[ The bit the alias must NOT touch. 1046 is deliberately absent from the
+         chain because adoulin 46 is "Flavors of Our Lives"; a range-based alias
+         would answer that quest's completion for a Mog Garden id that does not
+         exist. Asserted so a future tidy-up into `id >= 1039 and id <= 1049`
+         fails here.
+
+         BOTH blobs are sent, and that is the whole test. Adoulin says bit 46 is
+         SET and `other` says nothing is. A definite `false` therefore proves
+         the answer came from `other`; the aliased reading would say true, and
+         sending adoulin alone would only prove `other` had no data. ]]
+    state.reset()
+    state.handle_packet{Type = 0x00F8, ['Quest Flags'] = blob{46}}
+    state.handle_packet{Type = 0x00B0, ['Quest Flags'] = blob{}}
+    check('1046 is NOT aliased -- adoulin 46 is another quest entirely',
+          state.is_completed('quest', 'other', 1046) == false,
+          tostring(state.is_completed('quest', 'other', 1046)))
+    check('and adoulin 46 itself is still readable, so the blob really was set',
+          state.is_completed('quest', 'adoulin', 46) == true,
+          tostring(state.is_completed('quest', 'adoulin', 46)))
+
+    --[[ The other half of the alias's contract: quest/other below 256 must
+         still be answered by the OTHER blob, untouched. ]]
+    state.reset()
+    state.handle_packet{Type = 0x00B0, ['Quest Flags'] = blob{201}}
+    check('quest/other 201 still comes from the other blob, not adoulin',
+          state.is_completed('quest', 'other', 201) == true,
+          tostring(state.is_completed('quest', 'other', 201)))
+    check('and an adoulin id is not answered by the other blob',
+          state.is_completed('quest', 'adoulin', 201) == nil,
+          tostring(state.is_completed('quest', 'adoulin', 201)))
+
+    state.reset()
+end)()
+
 local frozen_bf = {}
 for _, w in ipairs(EXPECT_BITFIELD) do frozen_bf[w[1]] = true end
 local extra_bf = {}

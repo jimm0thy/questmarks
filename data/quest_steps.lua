@@ -7907,12 +7907,12 @@ return {
     {k='trade',npc='iron box',z=11,g='G-8',reqs={{kind='item',rid=15203,n=1}}},
     {k='travel',z=11,reqs={{kind='item',rid=15217,n=1}}},
   }},
-  ['quest/other/200'] = {conf=3, snpc='green thumb moogle', prev={'Hypnotic Hospitality'}, rep=false, sz=280, steps={
+  ['quest/other/200'] = {conf=3, snpc='green thumb moogle', prev={'Hypnotic Hospitality'}, ki={{rid=2417,nm='"MHMU Treatise on Agronomy"'},{rid=2424,nm='"MHMU Treatise on Forestry"'},{rid=2431,nm='"MHMU Treatise on Minerals"'},{rid=2438,nm='"MHMU Treatise on Fish I"'},{rid=2445,nm='"MHMU Treatise on Fish II"'}}, rep=false, sz=280, steps={
     {k='talk',npc='green thumb moogle',z=280},
     {k='obtain',ev={{kind='item',rid=17006,n=1},{kind='item',rid=5715,n=1},{kind='item',rid=942,n=1}}},
     {k='trade',npc='green thumb moogle',z=280,reqs={{kind='item',rid=17006,n=1},{kind='item',rid=5715,n=1},{kind='item',rid=942,n=1}}},
   }},
-  ['quest/other/201'] = {conf=3, snpc='green thumb moogle', rep=false, sz=280, steps={
+  ['quest/other/201'] = {conf=3, snpc='green thumb moogle', ki={{rid=2414,nm='"Fields And Fertilizing"'},{rid=2421,nm='"Grandiloquent Groves"'},{rid=2428,nm='"Varicose Mineral Veins"'},{rid=2435,nm='"Dredging\'s No Drudgery"'},{rid=2442,nm='"Black Fish of the Family"'}}, rep=false, sz=280, steps={
     {k='talk',npc='green thumb moogle',z=280},
     {k='talk',npc='chacharoon',z=280},
     {k='other',z=280},
@@ -8105,7 +8105,7 @@ return {
     {k='trade',npc='fire protocrystal',reqs={{kind='item',rid=1544,n=1}}},
     {k='fight',mobs={{name='ifrit prime',role='kill',n=1}}},
   }},
-  ['quest/outlands/100'] = {conf=2, snpc='kieran', lvl=75, rep=false, sz=252, steps={
+  ['quest/outlands/100'] = {conf=2, snpc='kieran', lvl=75, ki={{rid=35,nm='Adventurer\'s Certificate'}}, rep=false, sz=252, steps={
     {k='talk',npc='kieran',z=252,g='I-8',ev={{kind='ki',rid=1447,n=1}}},
     {k='talk',npc='hildegard',z=250,g='F-9',grp='briefings'},
     {k='talk',npc='gushing spring',z=247,g='G-8',grp='briefings'},

@@ -128,6 +128,18 @@ def collect(quests):
         for c in ((q.get("gates") or {}).get("craft") or []):
             add("skill", c.get("skill"), area)
             add("srank", c.get("rank"), area)
+        #[[ The key-item START gate, same rule: NAMES here, ids only downstream.
+        #
+        #   The name must be written EXACTLY as the wiki page authors it,
+        #   quotation marks and all. The six Adoulin survival skills carry two
+        #   literal `"` characters inside their own names, and normalize.lua
+        #   strips quotes but never adds them, so `"Watercrafting"` resolves to
+        #   ki 2205 while a tidied `Watercrafting` resolves to NOTHING. Worse,
+        #   the un-quoted `watercraft` is a DIFFERENT key item (2167, the boat
+        #   the skill lets you use), so tidying the quotes away does not fail
+        #   loudly -- it can silently gate on the wrong object. ]]
+        for k in ((q.get("gates") or {}).get("ki") or []):
+            add("ki", k.get("name"), area)
         add("zone", (q.get("start") or {}).get("zone"), area)
         add("npc", (q.get("start") or {}).get("npc"), area)
         #[[ ...and the page's own words for the same field, which is a different
@@ -482,6 +494,54 @@ def validate(q, res, quarantine):
                       "rk_nm": (look("srank", c["rank"]) or {}).get("en")
                                if c.get("rank") is not None else None})
 
+    #[[ --- the key-item START gate ------------------------------------------
+    #
+    #   "You cannot begin this quest without holding X." Distinct from the
+    #   step-level `items`, which say what you must hold to PERFORM a step and
+    #   which the runtime only enforces on a quest that begins by handing
+    #   something over. README's Known limitations already promises the
+    #   difference: "Items needed to COMPLETE a quest don't gate it. Items
+    #   needed to START one do."
+    #
+    #   An AND-list, like `craft` and unlike `jobs`. `Release the Fleece` names
+    #   five books and wants all five; there is no quest in the corpus for which
+    #   any-one-of would be the reading, and a scalar that met its second entry
+    #   would silently drop one.
+    #
+    #   KEY ITEMS ONLY, and that is a fact about the sensor rather than a
+    #   simplification. `windower.ffxi.get_key_items()` answers a set: you hold
+    #   it or you do not. Ordinary items would need a count, would have to come
+    #   out of a seventeen-bag sweep that can be refused, and are the very thing
+    #   the README promises NOT to gate on. A gate naming a non-key item is
+    #   dropped below rather than approximated.
+    #
+    #   Dropped, never approximated, for the reason the craft gate gives above:
+    #   a dropped gate leaves today's marker exactly as it is, while a gate
+    #   built on a name that did not resolve would grey a marker on our own data
+    #   being broken. Those are not symmetric. ]]
+    gate_ki, ki_names = [], set()
+    for k in (g.get("ki") or []):
+        if not isinstance(k, dict):
+            continue
+        raw = k.get("name") or "?"
+        kr = look("ki", k.get("name")) if k.get("name") else None
+        if not kr or kr.get("id") is None:
+            flags.add("ki_gate_unresolved")
+            q_add("gates.ki.name", str(raw), "key_item_unresolved",
+                  "gate dropped, marker unchanged")
+            continue
+        #[[ A repeat is a reading error, not an AND of one thing with itself.
+        #   Deduped rather than emitted twice so `//qm why` cannot say the same
+        #   sentence to a player twice. ]]
+        if kr["id"] in ki_names:
+            continue
+        ki_names.add(kr["id"])
+        #[[ The NAME rides along for the same reason the craft gate's does:
+        #   this gate can grey a marker, so `//qm why` has to be able to say
+        #   `needs "Watercrafting"` and not `needs key item 2205`. The addon
+        #   must not read res/ at runtime. ]]
+        gate_ki.append({"rid": kr["id"], "nm": kr.get("en") or raw})
+
     conf = q.get("confidence") or "low"
     if flags & FATAL:
         conf = "low"
@@ -522,6 +582,7 @@ def validate(q, res, quarantine):
         #   nothing downstream able to notice. ]]
         "lvl": g.get("level"), "jobs": g.get("jobs") or [],
         "craft": craft,
+        "ki": gate_ki,
         #[[ Kept VERBATIM as the page wrote it, including the numbered form
         #   ("Promathia Mission 3-2"). build_index.lua's resolve_prev_name is
         #   where every prerequisite name is finally matched, so de-number
@@ -645,6 +706,13 @@ def main():
     n_cbad = sum(1 for q in out if "craft_gate_unresolved" in (q.get("flags") or []))
     print("  craft gates    %d quest(s), %d gate(s), %d dropped as unresolvable"
           % (n_cq, n_cg, n_cbad))
+    #[[ Same reasoning, same unconditional print: the key-item START gate is the
+    #   other one that can grey a marker on sight. ]]
+    n_kq = sum(1 for q in out if q.get("ki"))
+    n_kg = sum(len(q.get("ki") or []) for q in out)
+    n_kbad = sum(1 for q in out if "ki_gate_unresolved" in (q.get("flags") or []))
+    print("  key-item gates %d quest(s), %d gate(s), %d dropped as unresolvable"
+          % (n_kq, n_kg, n_kbad))
     print("  quarantine     %d -> %s" % (len(quarantine), qp))
     seen = {}
     for r in quarantine:

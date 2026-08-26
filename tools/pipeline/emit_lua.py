@@ -303,6 +303,19 @@ def main():
                     ",nm=" + lua_str(c["nm"]) if c.get("nm") else "",
                     ",rk=" + lua_str(c["rk_nm"]) if c.get("rk_nm") else "")
                 for c in q["craft"]) + "}")
+        #[[ The key-item START gate: {rid, nm}. An AND-list for the same reason
+        #   `craft` is, and emitted as a list even at length one.
+        #
+        #   `nm` is not decoration. This gate can grey a marker, so `//qm why`
+        #   has to name what is missing in the words the player's own key item
+        #   menu uses, and core/prereq.lua may not read res/ at runtime. The
+        #   name legitimately contains literal `"` characters for the six
+        #   Adoulin survival skills, which is exactly what lua_str is for. ]]
+        if q.get("ki"):
+            p.append("ki={" + ",".join(
+                "{rid=%d%s}" % (k["rid"],
+                                ",nm=" + lua_str(k["nm"]) if k.get("nm") else "")
+                for k in q["ki"]) + "}")
         #[[ Fame and `repeatable` come from the wiki record, and from nowhere
         #   else. This is the only place they are decided.
         #

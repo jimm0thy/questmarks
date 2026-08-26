@@ -787,7 +787,8 @@
   "confidence": "high",
   "review_flags": [
    "unnamed_target",
-   "latent_unmodelled"
+   "latent_unmodelled",
+   "human_corrected"
   ],
   "notes": "A short Mog Garden chain, entirely in one zone, with no items and no key items anywhere in the walkthrough -- so no step carries evidence and the ladder relies on the session latch throughout. That is the correct answer here, not a reach.\n\nThe baby sheep is the one thing that cannot be marked. The page calls it 'your baby sheep' and 'a baby sheep'; the description calls it 'the bodyguard's lamb'; the next quest, Feeding Frenzy, does no better ('your baby sheep', 'the sheep'). None of those is an entity name, so the target is none/null rather than a guess at Lamb or Sheep. The step keeps its rung.\n\nSteps 2 and 4 are both Chacharoon but they are genuinely separated by the sheep, so they are not collapsed. The five key items under Item Reqs -- 'Fields And Fertilizing' and the rest -- are the Mog Garden rank-up books that make up the 'Level 4 Mog Garden' requirement, i.e. gates, not things this quest has you fetch; neither they nor 'Recruit Susuroon at least once' has a slot in the schema, so both are recorded here only.\n\nMoved out of the player-facing step notes (build vocabulary; see AUTHORING.md, 'Two notes, two audiences'):\n  step 3: The page never names it and neither does the following quest, so there is no entity name to record.",
   "gates": {
@@ -800,7 +801,24 @@
    "level": null,
    "jobs": [],
    "repeatable": false,
-   "expansion": null
+   "expansion": null,
+   "ki": [
+    {
+     "name": "\"Fields And Fertilizing\""
+    },
+    {
+     "name": "\"Grandiloquent Groves\""
+    },
+    {
+     "name": "\"Varicose Mineral Veins\""
+    },
+    {
+     "name": "\"Dredging's No Drudgery\""
+    },
+    {
+     "name": "\"Black Fish of the Family\""
+    }
+   ]
   },
   "start": {
    "npc": "Green Thumb Moogle",
@@ -919,7 +937,22 @@
     ],
     "note": "the cutscene ends this quest and opens Feeding Frenzy"
    }
-  ]
+  ],
+  "human": {
+   "edited_at": "2026-08-23T14:25:34Z",
+   "by": "gate-review",
+   "basis": "reading",
+   "reason": "gates.ki added: the five Mog Garden rank-up books this quest's own |Item Reqs= names. They are a START condition, not a fetch -- the page's |Quest Reqs= glosses them as 'Level 4 Mog Garden', no step of this quest obtains or spends them, and the walkthrough begins by simply speaking to the Green Thumb Moogle. This record's own notes already identified them as gates and said the schema had no slot; there is one now. Item Reqs is a sanctioned header field (AUTHORING 'Input'), so this is the strong-evidence case, not the Hide and Go Peak one. Without the gate every character sees a yellow '!' on the moogle from the moment the intro chain is done, however far off Mog Garden rank 4 is.",
+   "fields": [
+    "gates.ki",
+    "review_flags[3]"
+   ],
+   "source_at_edit": {
+    "revision_id": 699588,
+    "source_sha256": "0bcc23961f739c260761772937c492250a0addb702225a3c87e6f26ab1093716"
+   },
+   "history": []
+  }
  },
  {
   "schema": "questmarks-authoring/1",

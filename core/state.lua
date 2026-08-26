@@ -389,6 +389,59 @@ end
 -- Queries
 -- ---------------------------------------------------------------------------
 
+--[[ Ten quests whose completion bit is not where their id says it is.
+
+     The Mog Garden intro chain is listed in the client's OTHER AREAS quest log
+     and carries DAT ids 1039..1049, but the `other` blob is 32 bytes -- 256
+     bits, ids 0..255 -- so bit 1039 does not exist and never will. The bits are
+     really in the ADOULIN quest bitfield at `id - 1000`, which this addon has
+     decoded all along (0x00F0 current, 0x00F8 completed).
+
+     Three independent things say so, and none of them is a guess:
+
+       * ADOULIN'S ID SPACE HAS EXACTLY THIS HOLE. data/dat_names.lua gives
+         adoulin quests at 30..38 and 50.., and nothing at 39..45 or 47..49 --
+         the only gap in the table, and precisely the ten shifted ids. Id 46 IS
+         occupied, by "Flavors of Our Lives", which is why the Mog Garden chain
+         skips 1046: it would have collided.
+       * CHRONICLE READS THE SAME PACKETS AND GETS IT RIGHT. That addon carries
+         an explicit override -- "displayed under Other Areas but completion is
+         tracked in the Adoulin packet. Bit position = quest_id - 1000" -- and
+         on a character who has done the chain it reports all ten complete. Its
+         only source for that is adoulin[id - 1000].
+       * THE ARITHMETIC IS THE ONLY ONE THAT FITS. id-1024 lands on 15..25,
+         which is occupied by real adoulin quests; nothing else lines a
+         contiguous ten-id hole up with a contiguous ten-id chain.
+
+     Written as the ten ids rather than a range on purpose. A range would map a
+     hypothetical 1046 onto "Flavors of Our Lives" and answer another quest's
+     completion, which is the exact failure build_index.lua's identity binding
+     exists to prevent.
+
+     Aliased at READ time rather than renumbered in the data. The player's own
+     quest log, data/dat_names.lua and `//qm why` all agree these are
+     quest/other #1039; renumbering them to adoulin #39 would make every
+     diagnostic disagree with the menu the player is looking at.
+
+     What this was costing: `s[1040]` on a 256-entry set is nil, and `nil ==
+     true` is false, so is_completed answered a confident FALSE for a quest it
+     held no data about. status_of then returned 'available','exact' and all ten
+     drew a yellow "!" that no amount of play could clear. ]]
+local MOG_GARDEN = {
+    [1039] = 39, [1040] = 40, [1041] = 41, [1042] = 42, [1043] = 43,
+    [1044] = 44, [1045] = 45, [1047] = 47, [1048] = 48, [1049] = 49,
+}
+
+--[[ -> area, id, with the alias applied. Identity for everything else. ]]
+local function alias(cat, area, id)
+    if cat == 'quest' and area == 'other' then
+        local shifted = MOG_GARDEN[id]
+        if shifted then return 'adoulin', shifted end
+    end
+    return area, id
+end
+state._alias = alias            -- exposed for tests
+
 --[[ An id past the end of the blob reads `false`, on purpose.
 
      `s[id + 1] == true` cannot tell "the game said no" from "the blob never
@@ -401,19 +454,20 @@ end
 
      The trade is one-sided anyway. Merged, the campaign ladder covers 0..511
      and every campaign index row is <= 499, so the check would never fire for
-     the line it was written for. Its only live effect is quest/other
-     1039..1049, the ten Mog Garden quests, which would go from a wrong green
-     "!" to no marker at all. Those ids are probably reported in a log sub-type
-     this addon does not decode; worth finding out before anything is deleted. ]]
+     the line it was written for. Since the Mog Garden alias above, no shipped
+     quest row lands past its blob either, so nothing live now depends on this
+     answer -- it is kept because a data bug must still not delete a marker. ]]
 function state.is_completed(cat, area, id)
-    local s = bits[cat] and bits[cat].completed[area]
-    if s then return s[id + 1] == true end
+    local a, i = alias(cat, area, id)
+    local s = bits[cat] and bits[cat].completed[a]
+    if s then return s[i + 1] == true end
     return nil                                    -- no data for this area
 end
 
 function state.is_current(cat, area, id)
-    local s = bits[cat] and bits[cat].current[area]
-    if s then return s[id + 1] == true end
+    local a, i = alias(cat, area, id)
+    local s = bits[cat] and bits[cat].current[a]
+    if s then return s[i + 1] == true end
     return nil
 end
 
