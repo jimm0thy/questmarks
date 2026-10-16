@@ -233,31 +233,8 @@ function markers.settings() return cfg end
 
 local api
 local function default_api()
-    return {
-        create   = function(n) windower.prim.create(n) end,
-        delete   = function(n) windower.prim.delete(n) end,
-        texture  = function(n, p) windower.prim.set_texture(n, p) end,
-        pos      = function(n, x, y) windower.prim.set_position(n, x, y) end,
-        size     = function(n, w, h) windower.prim.set_size(n, w, h) end,
-        color    = function(n, a, r, g, b) windower.prim.set_color(n, a, r, g, b) end,
-        visible  = function(n, v) windower.prim.set_visibility(n, v) end,
-        fit      = function(n, v) windower.prim.set_fit_to_texture(n, v) end,
-        path     = function() return windower.addon_path .. 'assets/' end,
-
-        -- debug labels
-        tcreate  = function(n) windower.text.create(n) end,
-        tdelete  = function(n) windower.text.delete(n) end,
-        ttext    = function(n, s) windower.text.set_text(n, s) end,
-        tpos     = function(n, x, y) windower.text.set_location(n, x, y) end,
-        tvisible = function(n, v) windower.text.set_visibility(n, v) end,
-        tsetup   = function(n)
-            windower.text.set_font(n, 'Consolas')
-            windower.text.set_font_size(n, 9)
-            windower.text.set_color(n, 255, 255, 255, 255)
-            windower.text.set_bg_color(n, 160, 0, 0, 0)
-            windower.text.set_bg_visibility(n, true)
-        end,
-    }
+    -- Ashita: prims are ImGui draw-list entries, see render/backend.lua.
+    return require('render/backend').api(addon and addon.path)
 end
 
 function markers.set_api(t) api = t end

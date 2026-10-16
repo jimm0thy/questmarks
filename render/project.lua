@@ -29,6 +29,13 @@ project.begin() refuses to draw rather than placing markers wrongly.
 
 local project = {}
 
+
+--[[ Ashita port: where the matrices and screen size come from. Windower read them from
+     windower.get_camera() / get_windower_settings(); render/camera.lua and
+     render/backend.lua supply them now. ]]
+function project.set_camera_source(fn) project.camera_source = fn end
+function project.set_viewport_source(fn) project.viewport_source = fn end
+
 -- Resolved layout. Overridable at runtime via /qm layout for other builds.
 local L = {
     nested   = true,                        -- m[row][col], 1-indexed
@@ -241,7 +248,7 @@ function project.begin()
     end
     live = false
 
-    local cam = windower.get_camera()
+    local cam = (project.camera_source and project.camera_source() or nil)
     if not cam then
         return refuse('get_camera() returned nil')
     end
@@ -313,7 +320,7 @@ function project.begin()
     -- prim/text coordinates live in ui_*_res space (see libs/texts.lua:381)
     local now = os.clock()
     if now - vp_at > 1.0 then
-        local ws = windower.get_windower_settings()
+        local ws = (project.viewport_source and project.viewport_source() or nil)
         if ws then
             vp_w, vp_h, vp_at = ws.ui_x_res, ws.ui_y_res, now
         end

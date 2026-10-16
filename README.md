@@ -1,3 +1,7 @@
+> **Ashita v4 port (branch `ashita`).** This branch is a port of questmarks to Ashita v4, by Semil. It keeps the
+> original quest logic and data and replaces the Windower platform layer. See [README_ASHITA.md](README_ASHITA.md) for
+> install and usage; the rest of this README describes the original Windower addon and its `//qm` commands (`/qm` on Ashita).
+
 # questmarks
 
 WoW-style quest markers over FFXI NPCs, for Windower 4.
