@@ -12,7 +12,7 @@ packet definitions, only NPC dialogue. Three sources, combined with max():
      in your accepted list means you MUST have had fame 5 to accept it, so
      floor[region] = max(fame_lvl over accepted quests there). Completed
      non-repeatables stay in `current` forever, so it is a genuine lower bound.
-  3. Manual (`//qm fame sandoria 6`). Always available, always wins ties.
+  3. Manual (`/qm fame sandoria 6`). Always available, always wins ties.
 
 Estimating fame from completed-quest counts is deliberately not implemented.
 Fame per quest varies, repeatables grant it again, some grant none, and it
@@ -29,7 +29,7 @@ local MAX_LEVEL = 9
 
 -- region -> level, per source
 local learned = {}      -- from dialogue
-local manual  = {}      -- from //qm fame
+local manual  = {}      -- from /qm fame
 local floor_  = {}      -- inferred lower bound
 
 -- Every fame region the addon knows. Six of them ship checker anchors in
@@ -148,7 +148,7 @@ end
      SAME NPC are not logged as failures. FFXI splits long dialogue across
      several text events, so the tail of a matched line arrives on its own and
      must not be recorded as unclassified. That noise buries genuine anchor
-     failures, and //qm fame dump is the only channel for spotting those. ]]
+     failures, and /qm fame dump is the only channel for spotting those. ]]
 local last_matched_npc = nil
 
 --[[ Feed one line of already-decoded client text.
@@ -166,7 +166,7 @@ function fame.observe(text, zone)
         return region, lvl, (prev ~= lvl)
     end
 
-    -- Remember unclassified checker lines so //qm fame dump can surface them.
+    -- Remember unclassified checker lines so /qm fame dump can surface them.
     -- This is how a wrong anchor gets caught: every anchor was transcribed
     -- from a wiki, not from text the client actually emitted.
     if lvl == 'unmatched' and lnpc ~= last_matched_npc then
@@ -292,7 +292,7 @@ end
 
      Dialogue and manual readings answer both ways: they measure the value at
      a known moment. They do go stale as fame rises (295 entries are
-     fame-gated), so re-visit a checker or use `//qm fame`, not loosen this. ]]
+     fame-gated), so re-visit a checker or use `/qm fame`, not loosen this. ]]
 function fame.meets(region, required)
     if not region or not required or required <= 0 then return true end
     local have, src = fame.get(region)

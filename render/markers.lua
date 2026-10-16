@@ -140,7 +140,7 @@ end
 markers.STEP_GLYPH, markers.MOB_GLYPH = STEP_GLYPH, MOB_GLYPH
 markers.GLYPH_TINT = GLYPH_TINT
 
--- Kept for //qm why's textual output.
+-- Kept for /qm why's textual output.
 local STYLE = setmetatable({}, {__index = function(_, st)
     if not COLOR[st] then return nil end
     return {GLYPH[st] or 'bang'}
@@ -198,7 +198,7 @@ local cfg = {
          honest answer since the race field tells us nothing about them.
 
          The factors below are eyeballed from in-game proportions relative to a
-         Hume male, NOT measured. Tune with //qm sizescale (0 disables). ]]
+         Hume male, NOT measured. Tune with /qm sizescale (0 disables). ]]
     size_scale    = 1.0,
 }
 
@@ -233,31 +233,8 @@ function markers.settings() return cfg end
 
 local api
 local function default_api()
-    return {
-        create   = function(n) windower.prim.create(n) end,
-        delete   = function(n) windower.prim.delete(n) end,
-        texture  = function(n, p) windower.prim.set_texture(n, p) end,
-        pos      = function(n, x, y) windower.prim.set_position(n, x, y) end,
-        size     = function(n, w, h) windower.prim.set_size(n, w, h) end,
-        color    = function(n, a, r, g, b) windower.prim.set_color(n, a, r, g, b) end,
-        visible  = function(n, v) windower.prim.set_visibility(n, v) end,
-        fit      = function(n, v) windower.prim.set_fit_to_texture(n, v) end,
-        path     = function() return windower.addon_path .. 'assets/' end,
-
-        -- debug labels
-        tcreate  = function(n) windower.text.create(n) end,
-        tdelete  = function(n) windower.text.delete(n) end,
-        ttext    = function(n, s) windower.text.set_text(n, s) end,
-        tpos     = function(n, x, y) windower.text.set_location(n, x, y) end,
-        tvisible = function(n, v) windower.text.set_visibility(n, v) end,
-        tsetup   = function(n)
-            windower.text.set_font(n, 'Consolas')
-            windower.text.set_font_size(n, 9)
-            windower.text.set_color(n, 255, 255, 255, 255)
-            windower.text.set_bg_color(n, 160, 0, 0, 0)
-            windower.text.set_bg_visibility(n, true)
-        end,
-    }
+    -- Ashita: prims are ImGui draw-list entries, see render/backend.lua.
+    return require('render/backend').api(addon and addon.path)
 end
 
 function markers.set_api(t) api = t end
@@ -359,13 +336,13 @@ function markers.init(n)
     n = n or cfg.max_markers
 
     --[[ Floor it, and floor it here so every caller is covered rather than one
-         command. `//qm max` is `tonumber(a1)` with no integer check. A
+         command. `/qm max` is `tonumber(a1)` with no integer check. A
          fractional `n` makes `base = n - limit` fractional, every
          `visible[base + i]` is nil, and the renderer throws on every frame.
          Three throws trip the circuit breaker, and `max_markers` is persisted
          and re-applied at login, so the addon comes back up already broken,
-         with `//qm on` unable to clear it because the next frame throws again.
-         `//qm max 3.5` is a typo, not an attack, and it must not be able to
+         with `/qm on` unable to clear it because the next frame throws again.
+         `/qm max 3.5` is a typo, not an attack, and it must not be able to
          remove every marker in the game permanently. ]]
     n = math.floor(tonumber(n) or 0)
     if n < 0 then n = 0 end

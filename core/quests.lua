@@ -85,7 +85,7 @@ end
      from the BG Wiki cache.
 
      They stay split because they rebuild on different cadences: a mission
-     rebuild runs in game via //qm rebuild, a quest rebuild is an offline
+     rebuild runs in game via /qm rebuild, a quest rebuild is an offline
      pipeline, and a bad build of one cannot take the other down with it.
 
      Absent is not an error: an install that predates the split simply has all
@@ -206,7 +206,7 @@ function quests.load(path)
     index = t
 
     -- Copy rather than alias: merging missions in must not mutate the loaded
-    -- chunk's own table, which //qm rebuild may reload from underneath us.
+    -- chunk's own table, which /qm rebuild may reload from underneath us.
     local xstats = {}
     by_npc, by_zone = {}, {}
     local qn, qz = expand_v2(t, xstats)
@@ -368,7 +368,7 @@ function quests.marker_for(npc, zone)
     return best, count, details, best_cat, best_area, best_hint
 end
 
---[[ Full per-quest breakdown for `//qm why`. Includes entries with no marker
+--[[ Full per-quest breakdown for `/qm why`. Includes entries with no marker
      so the user can see WHY something is absent, which is the common question. ]]
 function quests.explain(npc, zone)
     local list = quests.for_npc(npc, zone)
@@ -378,7 +378,7 @@ function quests.explain(npc, zone)
 
          An NPC that is several steps of the same quest gets a by_npc row for
          each -- Bluffnix is both steps of "The Gobbiebag Part I", Ajithaam is
-         its first and last -- and //qm why printed the quest once per row.
+         its first and last -- and /qm why printed the quest once per row.
          That is noise in the one file people send when something looks wrong.
 
          The row that actually draws wins; failing that the first, so the
@@ -405,7 +405,7 @@ function quests.explain(npc, zone)
         --[[ marker_state's OWN reasons, kept rather than dropped. For an
              in-progress quest they are the entire turn-in explanation -- which
              step is current, whether its items are held -- and without them
-             //qm why shows a grey "?" with no way to tell "you are missing
+             /qm why shows a grey "?" with no way to tell "you are missing
              four items" from "this quest can never report readiness". ]]
         local st, mreasons = prereq.marker_state(e, e.step)
         local status, source = state.status_of(e.cat, e.area, e.id)
@@ -415,13 +415,13 @@ function quests.explain(npc, zone)
             name = quests.name_of(e.cat, e.area, e.id),
             marker = st,
             quest_status = status,
-            -- `//qm why` prints this: 'done' with no marker is otherwise
+            -- `/qm why` prints this: 'done' with no marker is otherwise
             -- indistinguishable from a mission you never touched.
             quest_source = source,
             reasons = reasons,
             suppressed = prereq.suppressed_reason(e, e.step),
             -- The whole step ladder, so a marker on the wrong NPC can be
-            -- diagnosed from one //qm why instead of guessed at. A quest that
+            -- diagnosed from one /qm why instead of guessed at. A quest that
             -- is not in progress has no position, and asking for one would
             -- both claim something untrue and pollute the step statistics.
             steps = steps.explain(e, status == 'in_progress'),
@@ -515,7 +515,7 @@ function quests.each_entry(fn)
 end
 
 -- ---------------------------------------------------------------------------
--- The whole-index view (//qm todo)
+-- The whole-index view (/qm todo)
 -- ---------------------------------------------------------------------------
 
 --[[ The single zone the GIVER stands in, or nil when that is not one place.
@@ -535,7 +535,7 @@ end
 
      Two zones means the giver really stands in both (prof. schultz, 112 and
      165) and we then name NEITHER; a confidently wrong city is worse than none.
-     Costs one row its zone and no row a marker: `where_of` feeds the `//qm todo`
+     Costs one row its zone and no row a marker: `where_of` feeds the `/qm todo`
      text and nothing else. ]]
 local function giver_zone(e)
     local key = fold(e.snpc)

@@ -23,7 +23,7 @@ local inventory = {}
      remembered. Keep it in step with res/bags.lua: a bag missing from this
      list is not a missing count, it is a wrong inference. An item in an
      unscanned bag reads as "not held", so the marker stays grey and the step
-     ladder pins to an earlier step, with `//qm why` calling it an honest
+     ladder pins to an earlier step, with `/qm why` calling it an honest
      evidence miss.
 
      `recycle` (17) is deliberately excluded: it is the delete bin, and an item

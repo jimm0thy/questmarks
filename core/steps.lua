@@ -170,7 +170,7 @@ function steps.current(q)
          completion: re-accept it and the mark starts partway along. Measured
          cost of excluding them outright instead was 93 of the 347 key-item
          quests -- a third of everything that can step -- so the trade goes the
-         other way, with `//qm steps off` as the escape hatch. ]]
+         other way, with `/qm steps off` as the escape hatch. ]]
 
     local n = #q.steps
     local key = qkey(q)
@@ -235,7 +235,7 @@ function steps.current(q)
          ours. ]]
     if idx > n then idx = n end
 
-    --[[ Its own label, not 'evidence'. `//qm why` printing "step 2 (evidence)"
+    --[[ Its own label, not 'evidence'. `/qm why` printing "step 2 (evidence)"
          when nothing was held would be a lie about where the number came from,
          and that line is the whole diagnosis path for "why is my marker here". ]]
     local source
@@ -293,7 +293,7 @@ end
 -- diagnostics
 -------------------------------------------------------------------------------
 
---[[ What `//qm why` should print in a ladder row's target column.
+--[[ What `/qm why` should print in a ladder row's target column.
 
      A step can be markable WITHOUT having an npc key -- that is what a monster
      step is -- so the printer cannot derive this from `npc` alone. It used to
@@ -315,13 +315,13 @@ local function row_label(s)
 end
 steps.row_label = row_label
 
---[[ One row per step for `//qm why`, including the verdict on each piece of
+--[[ One row per step for `/qm why`, including the verdict on each piece of
      evidence. This is the whole diagnosis path for "my marker is on the wrong
      NPC", so it reports what was checked, not just the conclusion. ]]
 --[[ `active` = the quest is in progress. When it is not, there IS no position
      -- only a giver -- so report the ladder without asking for one. That also
-     keeps //qm why from writing a latch entry for every quest it explains,
-     which is what once inflated //qm steps to "62 in progress" on a character
+     keeps /qm why from writing a latch entry for every quest it explains,
+     which is what once inflated /qm steps to "62 in progress" on a character
      with a handful. ]]
 function steps.explain(q, active)
     if type(q) ~= 'table' or type(q.steps) ~= 'table' or #q.steps == 0 then

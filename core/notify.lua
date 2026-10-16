@@ -22,7 +22,7 @@ local prereq = require('core/prereq')
 local ACTIONABLE = {ready = true, turnin = true}
 
 local prev = nil        -- key -> marker state at the last snapshot
-local last_gained = {}  -- the most recent batch, for //qm new
+local last_gained = {}  -- the most recent batch, for /qm new
 
 function notify.reset()
     prev, last_gained = nil, {}
@@ -62,7 +62,7 @@ end
 function notify.last() return last_gained end
 
 --[[ No zone grouping here. The announcement is one line (see report_new) and
-     `//qm new` walks the batch directly.
+     `/qm new` walks the batch directly.
 
      If it ever comes back, note that `entry.zone` is four-valued: a number,
      `false` for "any zone", the string 'moghouse', or nil when it never

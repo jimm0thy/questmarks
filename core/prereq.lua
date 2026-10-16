@@ -18,7 +18,7 @@ BLACK, not blue, and the distinction is load-bearing: render/markers.lua draws
 and {0,0,0} would erase the glyph -- while blue {90,170,255} is 'repeat'.
 
 Every predicate also records a human-readable reason, which is what makes
-`//qm why <npc>` able to explain any marker on screen.
+`/qm why <npc>` able to explain any marker on screen.
 ]]
 
 local prereq = {}
@@ -218,7 +218,7 @@ function prereq.evaluate(entry)
 
              This is still worth having. Above the threshold is a definite TRUE,
              and below it the marker goes from a confident yellow "!" to an
-             honest black one that `//qm why` can explain. The false yellow is
+             honest black one that `/qm why` can explain. The false yellow is
              removed without a false grey being invented to replace it.
 
              A RANK cannot be borrowed -- no equipment in the game moves the
@@ -410,7 +410,7 @@ function prereq.evaluate(entry)
              before the call, so this gate and the equipped gate one block up
              give the same answer to the same unread bags.
 
-             The cost is the first entry evaluated on a cold cache: `//qm todo`
+             The cost is the first entry evaluated on a cold cache: `/qm todo`
              right after a login reads black on that one until the next scan
              tick. That is the correct trade -- black says "not looked yet",
              which was true when we were asked, where grey claims a fact we did
@@ -560,7 +560,7 @@ end
      'unknown' is drawn NEAR-BLACK, not blue: render/markers.lua sets it to
      {25,25,32}, because set_color multiplies the texture and a true {0,0,0}
      would erase the glyph. Blue belongs to 'repeat' alone. ]]
---[[ Why an entry shows no marker at all, for //qm why. Returns nil when the
+--[[ Why an entry shows no marker at all, for /qm why. Returns nil when the
      entry is not suppressed (it may still have no marker for other reasons,
      e.g. completed and not repeatable). ]]
 function prereq.suppressed_reason(entry, at_step)
@@ -577,7 +577,7 @@ function prereq.suppressed_reason(entry, at_step)
          An entry now reaches the marker layer once per step whose target is
          this NPC, and only the CURRENT step may draw. Putting that here rather
          than in a new predicate is deliberate: marker_state already consults
-         this first and returns nil on a hit, and `//qm why` already prints the
+         this first and returns nil on a hit, and `/qm why` already prints the
          result as `- hidden: ...`. So the single most useful diagnostic in the
          feature -- the line that turns "my marker disappeared" into a
          one-liner -- costs no new printing code.
@@ -621,7 +621,7 @@ function prereq.suppressed_reason(entry, at_step)
                 at_giver = (info.marker_idx == 0)
             else
                 --[[ steps.current answers nil here for exactly one reason:
-                     `//qm steps off`. The other two nil paths -- no ladder, or
+                     `/qm steps off`. The other two nil paths -- no ladder, or
                      an empty one -- are already excluded by the `#entry.steps >
                      0` guard above.
 
@@ -735,7 +735,7 @@ function prereq.suppressed_reason(entry, at_step)
 end
 
 --[[ `at_step` is the step index of the by_npc row being evaluated, or nil for a
-     quest-level question (notify, zone_starts, //qm todo). Entries with no step
+     quest-level question (notify, zone_starts, /qm todo). Entries with no step
      data ignore it entirely, so a v1 index behaves exactly as it always has. ]]
 function prereq.marker_state(entry, at_step)
     --[[ Nation missions are mutually exclusive with your allegiance: a Windurst

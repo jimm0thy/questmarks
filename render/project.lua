@@ -23,13 +23,20 @@ The vertical SIGN is deliberately not baked -- it is resolved at runtime by
 resolve_vertical_sign(), which projects a point above and below an entity and
 keeps whichever lands higher on screen. Cheaper to measure than to argue about.
 
-If a future Windower build changes any of this, `//qm probe` reports it and
+If a future Windower build changes any of this, `/qm probe` reports it and
 project.begin() refuses to draw rather than placing markers wrongly.
 ]]
 
 local project = {}
 
--- Resolved layout. Overridable at runtime via //qm layout for other builds.
+
+--[[ Ashita port: where the matrices and screen size come from. Windower read them from
+     windower.get_camera() / get_windower_settings(); render/camera.lua and
+     render/backend.lua supply them now. ]]
+function project.set_camera_source(fn) project.camera_source = fn end
+function project.set_viewport_source(fn) project.viewport_source = fn end
+
+-- Resolved layout. Overridable at runtime via /qm layout for other builds.
 local L = {
     nested   = true,                        -- m[row][col], 1-indexed
     vec      = 'row',                       -- v' = v * M
@@ -136,7 +143,7 @@ project.frames_failed = 0        -- CONSECUTIVE; zeroed by the next good frame
      hides every marker, so that is the exact fault a bug report needs to name.
 
      Three cumulative fields, none of them ever cleared: how many frames were
-     refused in total, the worst unbroken run, and the last reason. `//qm diag`
+     refused in total, the worst unbroken run, and the last reason. `/qm diag`
      prints all three. ]]
 project.frames_failed_total = 0
 project.frames_failed_worst = 0
@@ -241,7 +248,7 @@ function project.begin()
     end
     live = false
 
-    local cam = windower.get_camera()
+    local cam = (project.camera_source and project.camera_source() or nil)
     if not cam then
         return refuse('get_camera() returned nil')
     end
@@ -313,7 +320,7 @@ function project.begin()
     -- prim/text coordinates live in ui_*_res space (see libs/texts.lua:381)
     local now = os.clock()
     if now - vp_at > 1.0 then
-        local ws = windower.get_windower_settings()
+        local ws = (project.viewport_source and project.viewport_source() or nil)
         if ws then
             vp_w, vp_h, vp_at = ws.ui_x_res, ws.ui_y_res, now
         end
@@ -538,7 +545,7 @@ function project.viewport()
     return vp_w, vp_h
 end
 
--- Diagnostics for //qm perf
+-- Diagnostics for /qm perf
 function project.timing()
     return dt_ema, dt_ratio
 end

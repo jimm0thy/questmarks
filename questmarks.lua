@@ -26,18 +26,27 @@ MUST NOT: require anything outside this addon or Windower's own stock libraries
 not write a global; tools/check.lua enforces that.
 ]]
 
-_addon.name     = 'questmarks'
-_addon.author   = 'DrNefarius'
+addon.name     = 'questmarks'
+addon.author   = 'Semil (Ashita port); original by DrNefarius'
+addon.desc     = 'WoW-style quest markers over FFXI NPCs'
+addon.link     = 'https://github.com/'
 --[[ Bump this whenever anything shipped changes. It is the only thing that
      tells two log files apart, and questmarks.log APPENDS across sessions --
      so during a multi-day test a single file holds several builds, and a line
      without a version is a line you cannot attribute. ]]
-_addon.version  = '1.0.0'
-_addon.commands = {'questmarks', 'qm'}
+-- Two version numbers: the port's own, and the Windower release it was ported from.
+local PORT_VERSION     = '0.7.1'   -- Ashita port by Semil; bump on every port change
+local ORIGINAL_VERSION = '1.0.0'   -- questmarks by DrNefarius (Windower 4) this is based on
+addon.version  = PORT_VERSION
+-- Commands: /qm and /questmarks (was /qm under Windower).
 
-require('logger')
-local config  = require('config')
-local packets = require('packets')
+local compat   = require('compat')       -- Windower-shaped facade over Ashita (see compat.lua)
+local windower = compat.windower
+local flog     = compat.flog
+local asettings = require('qm_settings')    -- own settings store (Ashita's `settings` lib differs between builds)
+local packets  = require('qm_packets')
+local logcache = require('qm_logcache')
+logcache.set_path((addon and addon.path or './') .. 'qm_log_cache.lua')      -- raw-packet decoders (replaces Windower's packets lib)
 
 -- Slash form is what works under Windower's Lua. Do not mix with dot form:
 -- Lua would treat them as separate modules and load each one twice, giving
@@ -61,6 +70,10 @@ local project   = require('render/project')
 
 local defaults = {
     enabled       = true,
+    --[[ Does this server have the later expansion content (Wings of the Goddess, Campaign,
+         Voracious Resurgence, ASA / MKD / ACP, Seekers of Adoulin, Rhapsodies)? Off, the
+         default, is right for servers that stop at Treasures of Aht Urhgan, such as HorizonXI. See /qm expansions. ]]
+    later_expansions = false,
     max_markers   = 16,
     icon_size     = 60,     -- px at ref_distance; tuned in game
     --[[ Scale markers by distance so they read as objects in the world rather
@@ -99,7 +112,7 @@ local defaults = {
          not load-bearing.
 
          To re-check whether `lag` still earns its keep under postrender, set
-         `//qm lag 0` and pan hard. Glued to the nameplate means the sampling
+         `/qm lag 0` and pan hard. Glued to the nameplate means the sampling
          point was the whole problem and the compensation is pure cost; still
          trailing, then catching up at the stop, means the prim overlay is
          itself a frame behind and lag has a job. Overshoot after a sudden stop
@@ -118,7 +131,7 @@ local defaults = {
          Named `repeat_quest` rather than `repeat` deliberately: an existing
          settings.xml pins whatever it already holds, so reusing the old key
          would leave anyone who ever toggled it stuck on their old value. A
-         NEW key picks up this default. `//qm show repeat` still works as an
+         NEW key picks up this default. `/qm show repeat` still works as an
          alias. See the note on defaults above. ]]
     show = {
         turnin = true, progress = true, ready = true,
@@ -138,7 +151,7 @@ local defaults = {
          saved value wins forever, so reusing an old one would leave anyone who
          had ever toggled it stuck on it. New keys take the default.
 
-         //qm steps off reproduces the pre-steps behaviour exactly, so the
+         /qm steps off reproduces the pre-steps behaviour exactly, so the
          feature is A/B-testable in game against the same data file. ]]
     steps         = true,
     --[[ Fame is PER CHARACTER, so it is keyed by character name rather than
@@ -148,14 +161,26 @@ local defaults = {
     fame_by_char = {},
 }
 
-local settings = config.load(defaults)
+--[[ Ashita's settings library swaps its table when the character changes, so the
+     rest of this file talks to a proxy that always points at the current one. ]]
+local settings_cur = asettings.load(defaults)
+local settings = setmetatable({}, {
+    __index    = function(_, k) return settings_cur[k] end,
+    __newindex = function(_, k, v) settings_cur[k] = v end,
+})
+local function save_settings() pcall(asettings.save) end
+local apply_settings_hook
+asettings.register('settings', 'settings_update', function(s)
+    if s ~= nil then settings_cur = s end
+    if apply_settings_hook then pcall(apply_settings_hook) end
+end)
 
 -- ---------------------------------------------------------------------------
 -- Runtime
 -- ---------------------------------------------------------------------------
 
 local candidates = {}       -- {index, name, x, y, z, state}
-local scan_filtered         -- what the last scan discarded, for //qm diag
+local scan_filtered         -- what the last scan discarded, for /qm diag
 local wanted = nil          -- npc key set for the current zone
 local cur_zone = nil
 local last_scan = 0
@@ -167,7 +192,7 @@ local inv_dirty = false
 local rebuild_pending = false
 local index_ok = false
 --[[ `frames` and `blank` are COUNTS, not timings, and both are reported by
-     `//qm diag` and `//qm perf`. `blank` is a frame on which markers.render()
+     `/qm diag` and `/qm perf`. `blank` is a frame on which markers.render()
      returned nil -- the camera refused, so every marker was hidden. Counted on
      this side of the call as well as inside project, because "how many frames
      did the player see nothing on" is the question a bug report actually asks,
@@ -181,7 +206,7 @@ local MODE_MESSAGE = 150    -- chat mode for NPC dialogue text
      Everything diagnostic goes to BOTH the chat log and questmarks.log in the
      addon directory. In-game chat cannot be copied out, so without a file
      there is no way to report what the addon actually saw -- which makes any
-     bug report a game of telephone. `//qm diag` dumps the whole picture in one
+     bug report a game of telephone. `/qm diag` dumps the whole picture in one
      go for exactly that reason. ]]
 local LOGFILE = 'questmarks.log'
 
@@ -226,12 +251,12 @@ local menu_seen_closed = false
      stop the renderer. Drawing nothing beats drawing somewhere wrong.
 
      Do NOT stop it by setting `settings.enabled = false`. That key is persisted
-     to data/settings.xml by thirteen `settings:save()` calls, so three unlucky
+     to data/settings.xml by thirteen `save_settings()` calls, so three unlucky
      frames would disable every marker on disk with no way back: render_frame()
      returns on its first line when `enabled` is false, so the
      `render_errors = 0` reset at the bottom is unreachable. `render_halted` is
-     the latch instead: runtime only, never saved, cleared by `//qm on` /
-     `//qm toggle` and by `login`, reported by `//qm diag`.
+     the latch instead: runtime only, never saved, cleared by `/qm on` /
+     `/qm toggle` and by `login`, reported by `/qm diag`.
 
      Declared up here beside menu_seen_closed because `login` assigns both and
      is written earlier. A `local` below a function that assigns the same name
@@ -244,7 +269,7 @@ local render_halted = false
 -- ---------------------------------------------------------------------------
 
 --[[ Turn an id into the name a human recognises: zones, and the environment
-     fields `//qm diag` reports.
+     fields `/qm diag` reports.
 
      Nothing in the marker path depends on any of this. The index carries ids
      because ids are what packets and the entity list speak; a name is only
@@ -268,6 +293,8 @@ local render_halted = false
 local res_cache = {}
 local function res_name(file, id)
     if type(id) ~= 'number' then return nil end
+    local n0 = compat.res_name(file, id)
+    if n0 then return n0 end
     local t = res_cache[file]
     if t == nil then
         t = {}
@@ -330,6 +357,7 @@ local function apply_settings()
          at login and at a mid-session reload, because the config library cannot
          pick the right section until a player exists. ]]
     steps.enable(settings.steps ~= false)
+    state.set_later_expansions(settings.later_expansions == true)
 end
 
 local function fame_key()
@@ -378,7 +406,7 @@ end
 local function save_fame()
     settings.fame_by_char = settings.fame_by_char or {}
     settings.fame_by_char[fame_key()] = fame.export()
-    local ok, e = pcall(function() settings:save() end)
+    local ok, e = pcall(function() save_settings() end)
     if not ok then log_only('fame save failed: %s', tostring(e)) end
 end
 
@@ -404,7 +432,7 @@ end
      more of the zone. Entities the client has not spawned simply have no
      position, which doubles as free render-gating. ]]
 -- `dead` starts at 0 rather than springing into existence on the first corpse,
--- so //qm diag can print it unconditionally. See the corpse filter below.
+-- so /qm diag can print it unconditionally. See the corpse filter below.
 scan_filtered = {hidden = 0, duplicate = 0, dead = 0, ghosts = {}}
 
 local function scan()
@@ -427,7 +455,7 @@ local function scan()
             has the entity spawned: false at range, true as you approach. So
             markers fade in and out with their NPCs, and lone ghosts go with
             them. The cost is deliberate: nothing is marked before the client
-            spawns it, even inside `//qm dist`. `//qm visible off` marks every
+            spawns it, even inside `/qm dist`. `/qm visible off` marks every
             entity in range instead.
 
          2. Dedup by name: one per name, targetable first, then nearest. You
@@ -435,7 +463,7 @@ local function scan()
 
          No documented "is rendered" flag exists, and `status`/`spawn_type`
          measured identical (0 and 2) for real NPCs and ghosts alike.
-         `//qm dump <npc>` prints every field of every copy. ]]
+         `/qm dump <npc>` prints every field of every copy. ]]
     local best = {}
     for idx, name in pairs(list) do
         local want = type(name) == 'string' and wanted[quests.fold(name)]
@@ -575,7 +603,7 @@ end
      at exactly the moment you are reading something else. Grouping by zone also
      has to cope with entries whose zone does not resolve.
 
-     The batch is still computed on every settle, so `//qm new` lists it on
+     The batch is still computed on every settle, so `/qm new` lists it on
      demand. This line exists only so you know there is something to list. ]]
 local function report_new()
     if not settings.notify or not index_ok then return end
@@ -583,14 +611,14 @@ local function report_new()
     local ok, gained = pcall(notify.update, quests)
     if not ok or #gained == 0 then return end
 
-    msg('%d newly available -- //qm new to list', #gained)
+    msg('%d newly available -- /qm new to list', #gained)
 end
 
 -- Debounced: the 0x056 burst arrives as ~27 packets on every zone-in.
 local function schedule_rebuild()
     if rebuild_pending then return end
     rebuild_pending = true
-    coroutine.schedule(function()
+    windower.schedule(function()
         rebuild_pending = false
         --[[ Protected as a whole. Unprotected, one bad entry takes the entire
              callback down: a raw Lua error in chat, and everything below it --
@@ -657,6 +685,11 @@ end
 
 windower.register_event('incoming chunk', function(id, original)
     if id == 0x056 then
+        -- Keep a copy for questmarks-ui, which may be loaded after the server sent these.
+        pcall(function()
+            local pl = windower.ffxi.get_player()
+            if pl and pl.name then logcache.record(pl.name, original) end
+        end)
         local ok, p = pcall(packets.parse, 'incoming', original)
         if ok and p then
             if state.handle_packet(p) then schedule_rebuild() end
@@ -687,7 +720,7 @@ windower.register_event('incoming chunk', function(id, original)
 
              `dirty_state` is deliberately NOT set either: a marker must not
              re-evaluate on every hit in a fight. ]]
-        local ok, a = pcall(windower.packets.parse_action, original)
+        local ok, a = pcall(packets.parse_action, original)
         if ok and a then pcall(kills.handle_action, a) end
 
     elseif id == 0x01F or id == 0x020 then
@@ -770,7 +803,7 @@ windower.register_event('incoming text', function(original, modified, mode)
         save_fame()
         dirty_state = true
         -- A fame level can unlock quests all over the world.
-        coroutine.schedule(report_new, 1)
+        windower.schedule(report_new, 1)
     end
 end)
 
@@ -894,7 +927,7 @@ end)
         no clue why. A real flag earns trust on the first frame you walk
         around; a constant never does, so the feature stays inert instead.
 
-     `//qm probe` prints the live value and its type. `menu_seen_closed` is
+     `/qm probe` prints the live value and its type. `menu_seen_closed` is
      declared near the top of the file, beside the output helpers. ]]
 local function menu_is_open(info)
     local v = info and info.menu_open
@@ -971,13 +1004,13 @@ local function render_frame()
             --[[ HALT, do not disable. `settings.enabled` is the player's own
                  switch and is written to disk; this fault is neither theirs nor
                  durable. Zero the counter on the way in so that whatever
-                 resumes -- //qm on, or the next login -- starts from a clean
+                 resumes -- /qm on, or the next login -- starts from a clean
                  slate instead of one bad frame away from halting again. ]]
             render_halted = true
             render_errors = 0
             markers.hide_all()
             err('render failed 3x, markers HALTED. Last error: %s', tostring(res))
-            err('nothing was saved -- //qm on resumes, //qm diag reports it.')
+            err('nothing was saved -- /qm on resumes, /qm diag reports it.')
         end
     else
         --[[ One good frame stops an intermittent throw accumulating toward the
@@ -1001,13 +1034,7 @@ end
      one string compare per frame. project.begin() -- which is what ages the
      matrix history -- is only reached from markers.render(), so the dormant
      hook cannot pollute the velocity estimate. ]]
-windower.register_event('prerender', function()
-    if settings.hook ~= 'postrender' then render_frame() end
-end)
-
-windower.register_event('postrender', function()
-    if settings.hook == 'postrender' then render_frame() end
-end)
+windower.register_event('postrender', function() render_frame() end)
 
 windower.register_event('unload', function()
     --[[ Non-negotiable: prims are named global objects and orphaned ones stay
@@ -1103,7 +1130,7 @@ end
      reason, the units are documented nowhere and the second reading is
      labelled as the guess it is.
 
-     Feeds `//qm probe` (chat) and `//qm diag` (log). ]]
+     Feeds `/qm probe` (chat) and `/qm diag` (log). ]]
 local function env_lines(head, detail)
     local info = windower.ffxi.get_info()
     if type(info) ~= 'table' then
@@ -1297,7 +1324,7 @@ local function cmd_fame(a1, a2)
             line('checker: %-18s %-10s zone %d', c.npc, c.region, c.zone)
         end
         if #fame.unmatched > 0 then
-            msg('unclassified checker lines seen: %d (use //qm fame dump)', #fame.unmatched)
+            msg('unclassified checker lines seen: %d (use /qm fame dump)', #fame.unmatched)
         end
         return
     end
@@ -1310,7 +1337,7 @@ local function cmd_fame(a1, a2)
         return
     end
 
-    if a2 == nil then err('usage: //qm fame <region> <0-9|reset>') return end
+    if a2 == nil then err('usage: /qm fame <region> <0-9|reset>') return end
     if a2 == 'reset' then
         fame.set_manual(a1, nil)
         msg('cleared manual fame for %s', a1)
@@ -1324,7 +1351,7 @@ local function cmd_fame(a1, a2)
 end
 
 local function cmd_why(name)
-    if not name then err('usage: //qm why <npc name>') return end
+    if not name then err('usage: /qm why <npc name>') return end
 
     -- allow the current target as a shortcut
     if name == 't' then
@@ -1445,9 +1472,9 @@ local function cmd_why(name)
     end
 end
 
---[[ //qm todo -- the whole index, filtered to what you can act on.
+--[[ /qm todo -- the whole index, filtered to what you can act on.
 
-     Markers only exist for NPCs you are standing near, and `//qm new` only
+     Markers only exist for NPCs you are standing near, and `/qm new` only
      reports CHANGES. Neither answers "what am I in the middle of". This walks
      every indexed entry and asks for its quest-level marker state, the same
      walk notify.update does on every 0x056 settle, so the cost is known and
@@ -1489,7 +1516,7 @@ local function cmd_todo(a1, a2)
         elseif markers.GLYPH[a] then
             want, what = {[a] = true}, a
         else
-            err('usage: //qm todo [all|turnin|progress|ready|unknown|blocked'
+            err('usage: /qm todo [all|turnin|progress|ready|unknown|blocked'
                 .. '|repeat] [n]')
             return
         end
@@ -1501,7 +1528,7 @@ local function cmd_todo(a1, a2)
     local ms = (os.clock() - t0) * 1000
 
     if #rows == 0 then
-        msg('nothing %s -- //qm todo all lists every state', what == 'accepted'
+        msg('nothing %s -- /qm todo all lists every state', what == 'accepted'
             and 'in progress or ready to hand in' or ('is ' .. what))
         return
     end
@@ -1516,10 +1543,10 @@ local function cmd_todo(a1, a2)
     msg('%d to do (%s): %s   [%.0f ms]', #rows, what,
         table.concat(tally, ', '), ms)
 
-    --[[ CHAT is capped and the LOG is not, the same split `//qm new` uses:
+    --[[ CHAT is capped and the LOG is not, the same split `/qm new` uses:
          truncating both would mean the overflow existed nowhere, and the log
          is the channel that exists precisely because chat cannot be read back.
-         `//qm todo <n>` raises the chat cap when you want it all in front of
+         `/qm todo <n>` raises the chat cap when you want it all in front of
          you. ]]
     for i, r in ipairs(rows) do
         local w = r.where or {}
@@ -1543,7 +1570,7 @@ end
      marker appears over empty air, run this on that NPC: comparing the two
      rows shows which field actually separates the real one from the ghost. ]]
 local function cmd_dump(name)
-    if not name then err('usage: //qm dump <npc name>  (or "t" for target)') return end
+    if not name then err('usage: /qm dump <npc name>  (or "t" for target)') return end
     if name == 't' then
         local t = windower.ffxi.get_mob_by_target('t')
         if not t then err('no target') return end
@@ -1590,13 +1617,13 @@ local function cmd_diag()
     local me = windower.ffxi.get_mob_by_target('me')
 
     log_only('')
-    log_only('================ //qm diag ================')
+    log_only('================ /qm diag ================')
     msg('writing diagnostics to %s%s', windower.addon_path, LOGFILE)
 
     local m = quests.meta()
     local npcs, entries = quests.stats()
-    line('addon %s  index %s entries / %d npc keys / %d rows  all_areas=%s',
-         _addon.version, tostring(m and m.indexed), npcs, entries,
+    line('addon port v%s (Semil) / original v%s (DrNefarius)  index %s entries / %d npc keys / %d rows  all_areas=%s',
+         PORT_VERSION, ORIGINAL_VERSION, tostring(m and m.indexed), npcs, entries,
          tostring(m and m.all_areas))
     --[[ The id ladder decides where every LINEAR mission line thinks you are,
          so a missing dat_names.lua is worth seeing at a glance in any bug
@@ -1612,7 +1639,7 @@ local function cmd_diag()
          stopped working". ]]
     line('zone %s  logged_in=%s  enabled=%s%s',
          tostring(info.zone), tostring(info.logged_in), tostring(settings.enabled),
-         render_halted and '   *** RENDER HALTED after 3 throws -- //qm on resumes' or '')
+         render_halted and '   *** RENDER HALTED after 3 throws -- /qm on resumes' or '')
     if me then line('player at %.2f, %.2f, %.2f', me.x, me.y, me.z) end
     --[[ The whole environment, because a bug report that says "markers
          vanished" is answered by menu_open and by nothing else. ]]
@@ -1711,7 +1738,7 @@ end
 --[[ Note on defaults: once a key exists in data/settings.xml, the value there
      wins and changing the default in this file has NO effect for anyone who
      has already run the addon. Do not "fix" behaviour by editing a default and
-     assume it reaches existing users -- it does not. //qm reset is the escape
+     assume it reaches existing users -- it does not. /qm reset is the escape
      hatch. ]]
 local NUMERIC = {
     dist = 'max_distance', max = 'max_markers', size = 'icon_size',
@@ -1728,13 +1755,13 @@ windower.register_event('addon command', function(cmd, a1, a2)
         --[[ Switching markers back on is also the acknowledgement that clears
              the render circuit breaker. The counter must go with it: left
              standing, the next single bad frame re-halts immediately and
-             `//qm on` appears to do nothing at all. ]]
+             `/qm on` appears to do nothing at all. ]]
         if settings.enabled and render_halted then
             render_halted, render_errors = false, 0
             msg('render halt cleared')
         end
         if not settings.enabled then markers.hide_all() end
-        settings:save()
+        save_settings()
         msg('markers %s', settings.enabled and 'ON' or 'OFF')
 
     elseif NUMERIC[cmd] then
@@ -1752,7 +1779,7 @@ windower.register_event('addon command', function(cmd, a1, a2)
         settings[key] = v
         markers.config{[key] = v}
         if cmd == 'max' then markers.init(v) end
-        settings:save()
+        save_settings()
         msg('%s = %s', cmd, tostring(v))
 
     elseif cmd == 'show' then
@@ -1770,7 +1797,7 @@ windower.register_event('addon command', function(cmd, a1, a2)
         if a1 == 'repeat' then a1 = 'repeat_quest' end      -- backwards-compatible alias
         if settings.show[a1] == nil then err('unknown state %q', a1) return end
         settings.show[a1] = (a2 == 'on') or (a2 == nil and not settings.show[a1])
-        settings:save()
+        save_settings()
         dirty_state = true
         msg('show %s = %s', a1, settings.show[a1] and 'on' or 'off')
 
@@ -1808,7 +1835,7 @@ windower.register_event('addon command', function(cmd, a1, a2)
     elseif cmd == 'reset' then
         if a1 ~= 'confirm' then
             err('this clears ALL saved settings for this character.')
-            err('fame readings are preserved. run:  //qm reset confirm')
+            err('fame readings are preserved. run:  /qm reset confirm')
             return
         end
         local keep = settings.fame_by_char
@@ -1822,14 +1849,14 @@ windower.register_event('addon command', function(cmd, a1, a2)
             end
         end
         settings.fame_by_char = keep
-        settings:save()
+        save_settings()
         msg('settings reset to defaults (fame kept). reloading ...')
         windower.send_command('lua reload questmarks')
 
     elseif cmd == 'steps' then
         if a1 == 'on' or a1 == 'off' then
             settings.steps = (a1 == 'on')
-            settings:save()
+            save_settings()
             steps.enable(settings.steps)
             dirty_state = true
             msg('step markers %s', settings.steps and 'ON' or 'OFF')
@@ -1848,7 +1875,7 @@ windower.register_event('addon command', function(cmd, a1, a2)
 
     elseif cmd == 'notify' then
         settings.notify = (a1 == 'on') or (a1 == nil and not settings.notify)
-        settings:save()
+        save_settings()
         msg('notifications %s', settings.notify and 'ON' or 'OFF')
 
     elseif cmd == 'todo' then
@@ -1888,7 +1915,7 @@ windower.register_event('addon command', function(cmd, a1, a2)
             return
         end
         settings.lag = project.set_lag(a1)
-        settings:save()
+        save_settings()
         msg('lag compensation = %.2f -- markers are extrapolated forward by the '
             .. 'camera movement measured last frame', settings.lag)
 
@@ -1901,15 +1928,15 @@ windower.register_event('addon command', function(cmd, a1, a2)
                 settings.hook)
             line('prerender samples the camera before the client updates it, so')
             line('deltas came out uneven and the compensation shimmered.')
-            line('switch hooks and compare with //qm lag 0 while panning hard.')
+            line('switch hooks and compare with /qm lag 0 while panning hard.')
             return
         end
         local want = (a1 == 'post' or a1 == 'postrender') and 'postrender'
                   or (a1 == 'pre' or a1 == 'prerender') and 'prerender'
-        if not want then err('usage: //qm hook pre|post') return end
+        if not want then err('usage: /qm hook pre|post') return end
         if want ~= settings.hook then
             settings.hook = want
-            settings:save()
+            save_settings()
             --[[ The two cached matrices would straddle the switch, so their
                  difference spans a partial frame. Drop them. ]]
             project.reset_history()
@@ -1928,7 +1955,7 @@ windower.register_event('addon command', function(cmd, a1, a2)
         settings.perspective = (a1 == 'on')
             or (a1 == nil and not settings.perspective)
         markers.config{perspective = settings.perspective}
-        settings:save()
+        save_settings()
         msg('perspective sizing %s -- %s', settings.perspective and 'ON' or 'OFF',
             settings.perspective
                 and ('markers scale with distance; %d px at %d yalms, clamped %d-%d')
@@ -1943,14 +1970,14 @@ windower.register_event('addon command', function(cmd, a1, a2)
             return
         end
         settings.smooth = project.set_smooth(a1)
-        settings:save()
+        save_settings()
         msg('smoothing = %.2f -- higher damps shimmer but ramps in more slowly '
             .. 'at the start of a turn', settings.smooth)
 
     elseif cmd == 'visible' then
         settings.visible_only = (a1 == 'on')
             or (a1 == nil and not settings.visible_only)
-        settings:save()
+        save_settings()
         last_scan = 0
         dirty_state = true
         msg('visible_only = %s -- %s', settings.visible_only and 'on' or 'off',
@@ -2033,14 +2060,14 @@ windower.register_event('addon command', function(cmd, a1, a2)
     elseif cmd == 'menu' then
         settings.hide_on_menu = (a1 == 'on')
             or (a1 == nil and not settings.hide_on_menu)
-        settings:save()
+        save_settings()
         msg('hide markers while a menu is open: %s',
             settings.hide_on_menu and 'ON' or 'OFF')
         if settings.hide_on_menu then
             line('the flag is only acted on once it has been seen to read')
             line('false at least once since login -- so if it never does, this')
             line('setting does nothing rather than blanking every marker.')
-            line('//qm probe shows its live value and whether it is trusted yet.')
+            line('/qm probe shows its live value and whether it is trusted yet.')
         end
 
     elseif cmd == 'probe' then
@@ -2074,7 +2101,7 @@ windower.register_event('addon command', function(cmd, a1, a2)
         msg('%d frame(s) rendered, %d blank (camera refused %d total, worst run %d)%s',
             perf.frames, perf.blank, project.frames_failed_total,
             project.frames_failed_worst,
-            render_halted and '   *** RENDER HALTED -- //qm on resumes' or '')
+            render_halted and '   *** RENDER HALTED -- /qm on resumes' or '')
 
     elseif cmd == 'rebuild' then
         --[[ Preserve the scope already built unless explicitly overridden, so a
@@ -2122,15 +2149,131 @@ windower.register_event('addon command', function(cmd, a1, a2)
             'refdist | pxmin | pxmax <n>   perspective tuning',
             'lag <0-3>         camera lag compensation (1 = one frame)',
             'hook pre|post     which render hook places the markers',
+            'expansions [on|off]  does this server have WotG/Campaign/TVR/... content? (default off)',
             'smooth <0-0.9>    damp marker shimmer (higher = steadier)',
             'sizescale <0-1>   scale marker height by NPC race (0 = fixed)',
             'settings          effective values, flagging stale saved ones',
             'reset confirm     clear saved settings (keeps fame)',
             'data | state [cat] <area> | probe | perf',
             'rebuild [all|v1]  regenerate the index',
-        }) do line('//qm ' .. l) end
+        }) do line('/qm ' .. l) end
     end
 end)
+
+-- ---------------------------------------------------------------------------
+-- Ashita-port commands (not in the Windower original)
+-- ---------------------------------------------------------------------------
+
+local camera  = require('render/camera')
+local backend = require('render/backend')
+
+local extra_commands = {}
+local selftest_on = false
+
+--[[ `/qm probe` -- everything that could not be verified offline, in one printout. ]]
+local function imgui_has(n)
+    local ok, im = pcall(require, 'imgui')
+    return ok and im and im[n] ~= nil
+end
+
+extra_commands.probe = function()
+    local st = camera.stats
+    msg('Ashita probe')
+    line('camera: captured=%d rejected_ortho=%d errors=%d matrix_accessor=%s',
+         st.captured, st.rejected_ortho, st.errors, tostring(st.accessor))
+    if st.last_error then line('camera last error: %s', st.last_error) end
+    local v, p = camera.matrices()
+    if v and p then
+        line('proj  [1][1]=%.3f [2][2]=%.3f [3][4]=%.3f [4][4]=%.3f', p[1][1], p[2][2], p[3][4], p[4][4])
+        line('view  row4 (translation) = %.2f %.2f %.2f', v[4][1], v[4][2], v[4][3])
+    else
+        line('no perspective projection captured yet')
+    end
+    local w, h = backend.viewport()
+    line('viewport: %s x %s', tostring(w), tostring(h))
+    line('backend last error: %s', tostring(backend.last_error))
+    line('draw list: %s  | AddImage ok=%d  AddText ok=%d  draw errors=%d',
+         tostring(backend.dl_source), backend.draw_calls.image, backend.draw_calls.text, backend.draw_errors)
+    line('imgui functions: Background=%s Foreground=%s Begin=%s WindowDL=%s',
+         tostring(imgui_has('GetBackgroundDrawList')), tostring(imgui_has('GetForegroundDrawList')),
+         tostring(imgui_has('Begin')), tostring(imgui_has('GetWindowDrawList')))
+    line('axes (mob x,y,z <- raw X,Y,Z indices): %d %d %d', compat.axes[1], compat.axes[2], compat.axes[3])
+    local me = windower.ffxi.get_mob_by_target('me')
+    if me then
+        line('me: x=%.1f y=%.1f z=%.1f  zone=%s', me.x, me.y, me.z, tostring(cur_zone))
+        local sx, sy = nil, nil
+        if project.begin() then sx, sy = project.above(me.x, me.y, me.z, 2.0) end
+        line('me projected 2y above: %s', sx and ('%.0f, %.0f'):format(sx, sy) or 'off screen / no camera')
+    else
+        line('no player entity')
+    end
+    local n, vis = 0, 0
+    for _, c in ipairs(candidates) do n = n + 1; if c.targetable then vis = vis + 1 end end
+    line('candidates this zone: %d (%d report valid_target)', n, vis)
+    line('try: /qm selftest   (draws a tag over your head), /qm axes <a b c>, /qm visible off, /qm lag 0')
+end
+
+--[[ `/qm axes 1 3 2` -- which raw Ashita position component feeds mob.x, mob.y, mob.z. ]]
+--[[ `/qm expansions [on|off]` -- see README_ASHITA.md. ]]
+extra_commands.expansions = function(a)
+    if a == 'on' or a == 'off' then
+        settings.later_expansions = (a == 'on')
+        save_settings()
+        state.set_later_expansions(settings.later_expansions)
+        dirty_state = true
+        msg('expansions %s%s', a == 'on' and 'ON' or 'OFF',
+            a == 'on' and '  (this server has WotG / Campaign / TVR / ... content)'
+                      or '  (a mission pointer of 0 means \"not started\")')
+        line('questmarks-ui: run /qmui reload to pick this up')
+    else
+        msg('expansions = %s   (usage: /qm expansions on|off)', settings.later_expansions and 'on' or 'off')
+        line('on  = this server HAS Wings of the Goddess, Campaign, Voracious Resurgence, ASA/MKD/ACP,')
+        line('       Adoulin or Rhapsodies content. The first mission of those lines then shows as in progress')
+        line('       while you are on it (it cannot be told apart from "not started" on a server without that content).')
+        line('off = a server without those expansions, such as HorizonXI (default): a 0 pointer means \"not started\".')
+    end
+end
+
+extra_commands.axes = function(a, b, c)
+    local t = {tonumber(a), tonumber(b), tonumber(c)}
+    local seen = {}
+    for i = 1, 3 do
+        if not t[i] or t[i] < 1 or t[i] > 3 or seen[t[i]] then
+            msg('axes = %d %d %d   (usage: /qm axes <x> <y> <z>, a permutation of 1 2 3)',
+                compat.axes[1], compat.axes[2], compat.axes[3])
+            return
+        end
+        seen[t[i]] = true
+    end
+    compat.axes = t
+    project.reset_history()
+    markers.reset_vertical_sign()
+    last_scan = 0
+    msg('axes set to %d %d %d', t[1], t[2], t[3])
+end
+
+--[[ `/qm selftest` -- a label that should sit just above your own head. If it does not,
+     the camera/axis assumptions are wrong and `/qm probe` says what the matrices look like. ]]
+extra_commands.selftest = function(a)
+    selftest_on = (a == 'on') or (a ~= 'off' and not selftest_on)
+    msg('selftest %s%s', selftest_on and 'ON' or 'OFF',
+        selftest_on and '  (normal markers paused)' or '')
+    if not selftest_on then backend.api(addon.path).tvisible('qm_selftest', false) end
+end
+
+local function selftest_frame()
+    local api = backend.api(addon.path)
+    local me = windower.ffxi.get_mob_by_target('me')
+    if not me or not project.begin() then api.tvisible('qm_selftest', false) return end
+    -- vertical offset sign is auto-resolved by markers.ensure_vertical_sign; pass something sane
+    markers.ensure_vertical_sign(me.x, me.y, me.z)
+    local sx, sy = project.above(me.x, me.y, me.z, 2.3)
+    if not sx then api.tvisible('qm_selftest', false) return end
+    api.tcreate('qm_selftest')
+    api.ttext('qm_selftest', 'v  questmarks selftest')
+    api.tpos('qm_selftest', sx - 60, sy - 16)
+    api.tvisible('qm_selftest', true)
+end
 
 -- ---------------------------------------------------------------------------
 -- Boot
@@ -2140,7 +2283,7 @@ do
     local meta, e = quests.load(windower.addon_path .. 'data/quest_index.lua')
     if not meta then
         err('%s', tostring(e))
-        err('run:  luajit tools/build_index.lua   (or //qm rebuild)')
+        err('run:  luajit tools/build_index.lua   (or /qm rebuild)')
     else
         index_ok = true
         --[[ Applied again on login, when the config library can finally
@@ -2168,9 +2311,90 @@ do
              without this, a log line cannot be attributed to the code that
              produced it. The ladder count is included because it moves whenever
              the index is regenerated, which the version alone would not catch. ]]
-        msg('v%s loaded %s entries over %d NPCs (%s step ladders) at %.2f '
-            .. 'marker height. //qm for help.',
-            _addon.version, tostring(meta.indexed), npcs,
+        msg('port v%s by Semil (based on questmarks v%s by DrNefarius) loaded %s entries over %d NPCs (%s step ladders) at %.2f '
+            .. 'marker height. /qm for help.',
+            PORT_VERSION, ORIGINAL_VERSION, tostring(meta.indexed), npcs,
             tostring(meta.steps or 0), markers.settings().head_offset)
     end
 end
+
+apply_settings_hook = function()
+    apply_settings()
+    if markers.settings().max_markers ~= nil then markers.init(settings.max_markers) end
+    load_fame()
+    dirty_state = true
+end
+
+-- ---------------------------------------------------------------------------
+-- Ashita glue: wires Ashita's events into the Windower-shaped handlers above
+-- ---------------------------------------------------------------------------
+
+project.set_camera_source(camera.get)
+project.set_viewport_source(function()
+    local w, h = backend.viewport()
+    if w then return {ui_x_res = w, ui_y_res = h} end
+    return nil
+end)
+
+inventory.set_api{
+    get_items = compat.get_items,
+    get_key_items = compat.get_key_items,
+    get_bag_info = compat.get_bag_info,
+}
+
+kills.set_api{
+    name_of = function(id)
+        local ok, m = pcall(windower.ffxi.get_mob_by_id, id)
+        return (ok and m) and m.name or nil
+    end,
+    mine = function(actor_id)
+        local me = windower.ffxi.get_mob_by_target('me')
+        if me and me.id == actor_id then return true end
+        for _, m in pairs(windower.ffxi.get_party()) do
+            if m.mob and m.mob.id == actor_id then return true end
+        end
+        return false
+    end,
+}
+
+local function try_register(event, name, fn)
+    local ok, e = pcall(ashita.events.register, event, name, fn)
+    if not ok then msg('could not register %s: %s', event, tostring(e)) end
+end
+
+local bit_ok, bit = pcall(require, 'bit')
+
+try_register('command', 'qm_command', function(e)
+    local args = {}
+    for w in e.command:gmatch('%S+') do args[#args + 1] = w end
+    if args[1] ~= '/qm' and args[1] ~= '/questmarks' then return end
+    e.blocked = true
+    local cmd = (args[2] or 'help'):lower()
+    local f = extra_commands[cmd]
+    if f then f(args[3], args[4], args[5]) return end
+    compat.fire('addon command', cmd, args[3], args[4])
+end)
+
+try_register('packet_in', 'qm_packet_in', function(e)
+    compat.fire('incoming chunk', e.id, e.data)
+end)
+
+try_register('text_in', 'qm_text_in', function(e)
+    local mode = bit_ok and bit.band(e.mode or 0, 0xFF) or e.mode
+    compat.fire('incoming text', e.message, e.message, mode)
+end)
+
+try_register('d3d_beginscene', 'qm_beginscene', function() camera.capture() end)
+
+try_register('d3d_present', 'qm_present', function()
+    camera.capture()
+    compat.tick()
+    pcall(logcache.flush)
+    if selftest_on then selftest_frame() else compat.fire('postrender') end
+    backend.flush()
+end)
+
+try_register('unload', 'qm_unload', function()
+    compat.fire('unload')
+    backend.destroy()
+end)

@@ -114,7 +114,7 @@ end
      callers never have to know the rule.
 
      The COUNTS ARE NOT CLEARED. A quest finishing narrows the set, and wiping
-     what was already counted would make `//qm kills` forget a fight you just
+     what was already counted would make `/qm kills` forget a fight you just
      had -- while a quest you re-accept in the same session keeps a tally that
      is at worst generous, and is display-only in either case. ]]
 function kills.set_watch(names)
@@ -159,7 +159,7 @@ function kills.handle_action(a)
                         --[[ Only monsters some accepted quest actually names.
                              Counting everything would turn a levelling session
                              into thousands of entries nobody will ever read,
-                             and `//qm kills` is meant to answer one question:
+                             and `/qm kills` is meant to answer one question:
                              am I done with this step. ]]
                         if nm and watch and watch[nm] then
                             counts[nm] = (counts[nm] or 0) + 1
@@ -224,7 +224,7 @@ function kills.stats()
             watching = n_watch}
 end
 
---[[ Every counted monster, highest first, for `//qm kills`. ]]
+--[[ Every counted monster, highest first, for `/qm kills`. ]]
 function kills.all()
     local out = {}
     for name, n in pairs(counts) do out[#out + 1] = {name = name, n = n} end

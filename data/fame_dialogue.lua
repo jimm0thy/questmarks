@@ -29,7 +29,7 @@ SOURCE -- FFXIclopedia's Reputation page is authoritative here.
   out in one table, level by level. Jeuno was the single biggest gap: 116 of
   the indexed quests are gated on it.
 
-  Anything learned from an unrecognised checker is recorded by //qm fame dump,
+  Anything learned from an unrecognised checker is recorded by /qm fame dump,
   so remaining gaps can be closed from real observation rather than a wiki.
 
 Sources: https://ffxiclopedia.fandom.com/wiki/Reputation (Jeuno/Outlands table)

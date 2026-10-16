@@ -5,7 +5,7 @@ This file is applied by tools/build_index.lua BEFORE any parsing, so an entry
 here wins outright over the automatic normalizer. Re-run the builder after
 editing:
 
-    luajit tools/build_index.lua        (or //qm rebuild in game)
+    luajit tools/build_index.lua        (or /qm rebuild in game)
 
 Keys are the page's raw giver string -- the `Start=` field verbatim --
 lowercased and whitespace-collapsed.
