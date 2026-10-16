@@ -41,7 +41,7 @@ it sits at `Windower4/addons/questmarks/` (you might need to remove the suffixes
 To load it every session, add `lua load questmarks` to your Windower init
 script.
 
-**A browsable list, if you want one.** [questmarks-ui](https://github.com/DrNefarius/questmarks-ui/) is a
+**A browsable list, if you want one.** [questmarks-ui](https://github.com/jimm0thy/questmarks-ui) is a
 separate addon, in its own repository, that puts your accepted quests in an
 in-game window grouped by region, with each quest's full step ladder beside it.
 It reads this addon's data and its `build/` directory off disk; nothing here
