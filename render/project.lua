@@ -23,13 +23,13 @@ The vertical SIGN is deliberately not baked -- it is resolved at runtime by
 resolve_vertical_sign(), which projects a point above and below an entity and
 keeps whichever lands higher on screen. Cheaper to measure than to argue about.
 
-If a future Windower build changes any of this, `//qm probe` reports it and
+If a future Windower build changes any of this, `/qm probe` reports it and
 project.begin() refuses to draw rather than placing markers wrongly.
 ]]
 
 local project = {}
 
--- Resolved layout. Overridable at runtime via //qm layout for other builds.
+-- Resolved layout. Overridable at runtime via /qm layout for other builds.
 local L = {
     nested   = true,                        -- m[row][col], 1-indexed
     vec      = 'row',                       -- v' = v * M
@@ -136,7 +136,7 @@ project.frames_failed = 0        -- CONSECUTIVE; zeroed by the next good frame
      hides every marker, so that is the exact fault a bug report needs to name.
 
      Three cumulative fields, none of them ever cleared: how many frames were
-     refused in total, the worst unbroken run, and the last reason. `//qm diag`
+     refused in total, the worst unbroken run, and the last reason. `/qm diag`
      prints all three. ]]
 project.frames_failed_total = 0
 project.frames_failed_worst = 0
@@ -538,7 +538,7 @@ function project.viewport()
     return vp_w, vp_h
 end
 
--- Diagnostics for //qm perf
+-- Diagnostics for /qm perf
 function project.timing()
     return dt_ema, dt_ratio
 end

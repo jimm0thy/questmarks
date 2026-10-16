@@ -14,7 +14,7 @@ you have looked at the key item in the menu) is available nowhere else. The
 addon used to drop the body and treat 0x055 as a "re-sweep the bags" ping that
 killed the whole inventory cache; a zone-in sends six or more, so arriving
 anywhere forced repeated 17-bag sweeps for data the packet already held.
-`examined` only shows in `//qm why` and `//qm diag`; no dataset step uses it.
+`examined` only shows in `/qm why` and `/qm diag`; no dataset step uses it.
 
 Category `t` carries ids `t*512 + bit`. fields.lua's comment says six
 categories, which stops at id 3071, but res/key_items.lua here runs to 3381.
@@ -26,7 +26,7 @@ special-cased six; any `Type` is accepted and offsets by 512.
 The same comparison runs on every sweep, so a ninth category shows up as a
 number rather than a surprise. The decode is TRUSTED only after a run with no
 disagreement in either direction; until then the swept list stays authoritative
-and this module is information only. `//qm data` prints the verdict, the
+and this module is information only. `/qm data` prints the verdict, the
 categories seen and the highest id.
 ]]
 

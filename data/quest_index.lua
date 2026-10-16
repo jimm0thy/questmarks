@@ -1,5 +1,5 @@
 -- questmarks quest index -- GENERATED FILE, DO NOT EDIT BY HAND.
--- Regenerate: luajit tools/build_index.lua   (or //qm rebuild in game)
+-- Regenerate: luajit tools/build_index.lua   (or /qm rebuild in game)
 --
 -- Quest metadata derived from BG Wiki (https://www.bg-wiki.com),
 -- licensed CC BY-NC-SA 3.0, from TWO sources merged here:

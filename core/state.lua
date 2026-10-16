@@ -133,7 +133,7 @@ local NATION_AREA = {[0] = 'sandoria', [1] = 'bastok', [2] = 'windurst'}
 
      Any member completed completes the group, symmetric because we have only
      seen one player's bitfields. First id is the umbrella, the rest branches;
-     completed_sibling() prefers a branch so //qm why can say "completed via The
+     completed_sibling() prefers a branch so /qm why can say "completed via The
      Three Kingdoms (Bastok)" and name the route actually taken. ]]
 local EXCLUSIVE = {
     ['mission/sandoria'] = {{5, 8, 9}},
@@ -170,7 +170,7 @@ local function completed_sibling(cat, area, id)
     end
     return umbrella
 end
--- Public so `//qm why` can name the branch that was actually taken.
+-- Public so `/qm why` can name the branch that was actually taken.
 state.completed_sibling = completed_sibling
 
 -- ---------------------------------------------------------------------------
@@ -419,7 +419,7 @@ end
      exists to prevent.
 
      Aliased at READ time rather than renumbered in the data. The player's own
-     quest log, data/dat_names.lua and `//qm why` all agree these are
+     quest log, data/dat_names.lua and `/qm why` all agree these are
      quest/other #1039; renumbering them to adoulin #39 would make every
      diagnostic disagree with the menu the player is looking at.
 
@@ -564,7 +564,7 @@ function state.status_of(cat, area, id)
     return 'available', 'linear'
 end
 
--- Diagnostics for //qm state
+-- Diagnostics for /qm state
 function state.dump(cat, area)
     local out = {current = {}, completed = {}, linear = linear[cat] and linear[cat][area]}
     for _, kind in ipairs({'current', 'completed'}) do

@@ -35,7 +35,7 @@ with nothing trusted. One DISCRIMINATING skill is needed as well, one whose
 value differs between candidates: a character with every craft at 0 makes the
 raw-word, level and rank readings identical, and a vacuous pass is worth less
 than no experiment. Tables with named rank/level fields say what they are and
-skip all this; `//qm probe` prints the raw value, the shape and the verdict.
+skip all this; `/qm probe` prints the raw value, the shape and the verdict.
 
 Tri-state throughout: before a 0x062 arrives, craft rank is UNKNOWN, not zero.
 Reading it as zero would grey every craft-gated quest just because the addon
@@ -103,7 +103,7 @@ local SKILL_KEYS = {
     [57] = 'synergy',
 }
 --[[ res/synth_ranks.lua: 0 Amateur .. 8 Adept .. 10 Expert. Named here only so
-     `//qm probe` and the build's assertions can say "8 is Adept" without this
+     `/qm probe` and the build's assertions can say "8 is Adept" without this
      module reading res/ -- which it must not do, being shipped code. ]]
 skills.MAX_RANK = 10
 
@@ -111,7 +111,7 @@ skills.MAX_RANK = 10
 local by_id = {}
 local n_packets = 0
 local shape = nil               -- nil until get_player().skills has been looked at
-local shape_detail = nil        -- human-readable, for //qm probe
+local shape_detail = nil        -- human-readable, for /qm probe
 local player_trusted = false
 local player_skills = nil       -- the last table get_player() handed over
 local identified = nil          -- the surviving reading, for skills.get
@@ -570,7 +570,7 @@ end
 
 -------------------------------------------------------------------------------
 
---[[ Everything //qm probe and //qm data need to settle the open question from
+--[[ Everything /qm probe and /qm data need to settle the open question from
      one login: whether a packet arrived, what get_player().skills turned out to
      be, and -- for the craft block specifically -- the numbers themselves, since
      an all-zero character is exactly the case where the experiment proves

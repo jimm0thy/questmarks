@@ -140,7 +140,7 @@ end
 markers.STEP_GLYPH, markers.MOB_GLYPH = STEP_GLYPH, MOB_GLYPH
 markers.GLYPH_TINT = GLYPH_TINT
 
--- Kept for //qm why's textual output.
+-- Kept for /qm why's textual output.
 local STYLE = setmetatable({}, {__index = function(_, st)
     if not COLOR[st] then return nil end
     return {GLYPH[st] or 'bang'}
@@ -198,7 +198,7 @@ local cfg = {
          honest answer since the race field tells us nothing about them.
 
          The factors below are eyeballed from in-game proportions relative to a
-         Hume male, NOT measured. Tune with //qm sizescale (0 disables). ]]
+         Hume male, NOT measured. Tune with /qm sizescale (0 disables). ]]
     size_scale    = 1.0,
 }
 
@@ -359,13 +359,13 @@ function markers.init(n)
     n = n or cfg.max_markers
 
     --[[ Floor it, and floor it here so every caller is covered rather than one
-         command. `//qm max` is `tonumber(a1)` with no integer check. A
+         command. `/qm max` is `tonumber(a1)` with no integer check. A
          fractional `n` makes `base = n - limit` fractional, every
          `visible[base + i]` is nil, and the renderer throws on every frame.
          Three throws trip the circuit breaker, and `max_markers` is persisted
          and re-applied at login, so the addon comes back up already broken,
-         with `//qm on` unable to clear it because the next frame throws again.
-         `//qm max 3.5` is a typo, not an attack, and it must not be able to
+         with `/qm on` unable to clear it because the next frame throws again.
+         `/qm max 3.5` is a typo, not an attack, and it must not be able to
          remove every marker in the game permanently. ]]
     n = math.floor(tonumber(n) or 0)
     if n < 0 then n = 0 end

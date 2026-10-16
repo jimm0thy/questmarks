@@ -1,5 +1,5 @@
 -- questmarks mission index -- GENERATED FILE, DO NOT EDIT BY HAND.
--- Regenerate: luajit tools/build_index.lua   (or //qm rebuild in game)
+-- Regenerate: luajit tools/build_index.lua   (or /qm rebuild in game)
 --
 -- Mission metadata derived from BG Wiki (https://www.bg-wiki.com),
 -- licensed CC BY-NC-SA 3.0. See NOTICE.
@@ -14,7 +14,7 @@
 --
 -- No other addon is read, at build time or at run time.
 --
--- This file is the ONLY part of the index //qm rebuild touches.
+-- This file is the ONLY part of the index /qm rebuild touches.
 --
 -- areas: ALL, EXCLUDING quest/coalition -- out of scope, see EXCLUDED_AREAS in tools/build_index.lua
 -- indexed=435  npc keys=569  rows=1895
