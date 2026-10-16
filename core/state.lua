@@ -114,6 +114,18 @@ local FIELD_LOGS = {
 
 local NATION_AREA = {[0] = 'sandoria', [1] = 'bastok', [2] = 'windurst'}
 
+-- Mission lines where a current-mission pointer of 0 means "not started" (see handle_packet).
+local ZERO_MEANS_NONE = {wotg = true, campaign = true, tvr = true, asa = true, mkd = true,
+                         acp = true, adoulin = true, rov = true}
+
+--[[ `later_expansions` = the server HAS that content. Then a 0 pointer can be a real
+     "on the first mission", so it is kept as the original did (the first mission of the
+     line reads as in progress). Off (the default) = servers without that content, where
+     0 only ever means "never started". Set from the /qm expansions setting. ]]
+local later_expansions = false
+local raw_zero = {}      -- raw_zero[area] = true while the last pointer seen for it was 0
+
+
 --[[ Mutually exclusive mission branches.
 
      The rank-2 nation mission sends you to the OTHER two nations, one DAT entry
@@ -201,9 +213,25 @@ function state.reset()
     linear = {quest = {}, mission = {}}
     linear_idle = {quest = {}, mission = {}}
     raw = {}
+    raw_zero = {}
     loaded = false
 end
 state.reset()
+
+local function apply_zero_rule()
+    for area in pairs(ZERO_MEANS_NONE) do
+        if raw_zero[area] and linear and linear.mission then
+            linear.mission[area] = later_expansions and 0 or nil
+        end
+    end
+end
+
+function state.set_later_expansions(on)
+    later_expansions = on and true or false
+    apply_zero_rule()
+end
+
+function state.later_expansions() return later_expansions end
 
 function state.is_loaded() return loaded end
 
@@ -366,7 +394,22 @@ function state.handle_packet(p)
                         if no_active then v = v + 2147483648 end
                         linear_idle[f.cat][f.area] = no_active
                     end
-                    linear[f.cat][f.area] = v
+                    --[[ ASHITA PORT FIX. A pointer of 0 on one of the later expansion lines
+                         means "never started" (on a server without that content the client
+                         always sends 0). resolve_linear() rounds any pointer UP to the first
+                         known mission, so 0 used to report the first mission of the line as
+                         in progress -- e.g. "Cavernous Maws", "Smokescreen I (S)" and TVR's
+                         first mission showing up as accepted on a character that has never
+                         seen them. Leave the pointer unset instead. The older lines (nation,
+                         Zilart, CoP, ToAU, Assault) are untouched: a 0 there can be real. ]]
+                    if ZERO_MEANS_NONE[f.area] and f.cat == 'mission' then
+                        raw_zero[f.area] = (v == 0) or nil
+                    end
+                    if v == 0 and ZERO_MEANS_NONE[f.area] and not later_expansions then
+                        linear[f.cat][f.area] = nil
+                    else
+                        linear[f.cat][f.area] = v
+                    end
                     touched = true
                 end
             end
@@ -419,7 +462,7 @@ end
      exists to prevent.
 
      Aliased at READ time rather than renumbered in the data. The player's own
-     quest log, data/dat_names.lua and `/qm why` all agree these are
+     quest log, data/dat_names.lua and `//qm why` all agree these are
      quest/other #1039; renumbering them to adoulin #39 would make every
      diagnostic disagree with the menu the player is looking at.
 

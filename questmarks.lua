@@ -35,7 +35,7 @@ addon.link     = 'https://github.com/'
      so during a multi-day test a single file holds several builds, and a line
      without a version is a line you cannot attribute. ]]
 -- Two version numbers: the port's own, and the Windower release it was ported from.
-local PORT_VERSION     = '0.6.0'   -- Ashita port by Semil; bump on every port change
+local PORT_VERSION     = '0.7.1'   -- Ashita port by Semil; bump on every port change
 local ORIGINAL_VERSION = '1.0.0'   -- questmarks by DrNefarius (Windower 4) this is based on
 addon.version  = PORT_VERSION
 -- Commands: /qm and /questmarks (was /qm under Windower).
@@ -70,6 +70,10 @@ local project   = require('render/project')
 
 local defaults = {
     enabled       = true,
+    --[[ Does this server have the later expansion content (Wings of the Goddess, Campaign,
+         Voracious Resurgence, ASA / MKD / ACP, Seekers of Adoulin, Rhapsodies)? Off, the
+         default, is right for servers that stop at Treasures of Aht Urhgan, such as HorizonXI. See /qm expansions. ]]
+    later_expansions = false,
     max_markers   = 16,
     icon_size     = 60,     -- px at ref_distance; tuned in game
     --[[ Scale markers by distance so they read as objects in the world rather
@@ -353,6 +357,7 @@ local function apply_settings()
          at login and at a mid-session reload, because the config library cannot
          pick the right section until a player exists. ]]
     steps.enable(settings.steps ~= false)
+    state.set_later_expansions(settings.later_expansions == true)
 end
 
 local function fame_key()
@@ -2144,6 +2149,7 @@ windower.register_event('addon command', function(cmd, a1, a2)
             'refdist | pxmin | pxmax <n>   perspective tuning',
             'lag <0-3>         camera lag compensation (1 = one frame)',
             'hook pre|post     which render hook places the markers',
+            'expansions [on|off]  does this server have WotG/Campaign/TVR/... content? (default off)',
             'smooth <0-0.9>    damp marker shimmer (higher = steadier)',
             'sizescale <0-1>   scale marker height by NPC race (0 = fixed)',
             'settings          effective values, flagging stale saved ones',
@@ -2208,6 +2214,26 @@ extra_commands.probe = function()
 end
 
 --[[ `/qm axes 1 3 2` -- which raw Ashita position component feeds mob.x, mob.y, mob.z. ]]
+--[[ `/qm expansions [on|off]` -- see README_ASHITA.md. ]]
+extra_commands.expansions = function(a)
+    if a == 'on' or a == 'off' then
+        settings.later_expansions = (a == 'on')
+        save_settings()
+        state.set_later_expansions(settings.later_expansions)
+        dirty_state = true
+        msg('expansions %s%s', a == 'on' and 'ON' or 'OFF',
+            a == 'on' and '  (this server has WotG / Campaign / TVR / ... content)'
+                      or '  (a mission pointer of 0 means \"not started\")')
+        line('questmarks-ui: run /qmui reload to pick this up')
+    else
+        msg('expansions = %s   (usage: /qm expansions on|off)', settings.later_expansions and 'on' or 'off')
+        line('on  = this server HAS Wings of the Goddess, Campaign, Voracious Resurgence, ASA/MKD/ACP,')
+        line('       Adoulin or Rhapsodies content. The first mission of those lines then shows as in progress')
+        line('       while you are on it (it cannot be told apart from "not started" on a server without that content).')
+        line('off = a server without those expansions, such as HorizonXI (default): a 0 pointer means \"not started\".')
+    end
+end
+
 extra_commands.axes = function(a, b, c)
     local t = {tonumber(a), tonumber(b), tonumber(c)}
     local seen = {}

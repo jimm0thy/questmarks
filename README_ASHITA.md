@@ -1,6 +1,6 @@
 # questmarks — Ashita v4 port
 
-Ashita v4 port **v0.6.0** by **Semil** of **questmarks 1.0.0** by **DrNefarius** (Windower 4).
+Ashita v4 port **v0.7.1** by **Semil** of **questmarks 1.0.0** by **DrNefarius** (Windower 4).
 Quest/mission logic, data and icons are the original's; only the platform layer changed.
 
 ## Install
@@ -55,3 +55,35 @@ Not verified, so the first things to check if something looks off on another bui
 ## License
 Code: MIT (see `LICENSE`). Bundled quest data: CC BY-NC-SA 3.0 from BG Wiki (`LICENSE-DATA`);
 `data/dat_names.lua` contains Square Enix content (`NOTICE`). Original author credit: DrNefarius.
+
+## `/qm expansions` — which server are you on?
+Mission lines that came with later expansions (Wings of the Goddess, Campaign, The Voracious Resurgence,
+A Shantotto Ascension, A Moogle Kupo d'Etat, A Crystalline Prophecy, Seekers of Adoulin, Rhapsodies of Vana'diel)
+report your progress as a single "current mission" number. The game sends **0** both for "never started" and for
+"on the first mission", and the two cannot be told apart. So the addon has to pick one reading:
+
+| Setting | Use it when | What a 0 means |
+|---|---|---|
+| `/qm expansions off` (**default**) | Your server does **not** have that content, e.g. HorizonXI (which goes up to Treasures of Aht Urhgan and has none of these) | "Not started". The first mission of those lines shows as *available* (a `!` over the NPC), never as in progress. |
+| `/qm expansions on` | Your server **does** have that content (Wings of the Goddess or later, e.g. a retail-like server) | "On the first mission". The first mission shows as *in progress* while you are on it, and appears in questmarks-ui. The cost: on a character that has **never started** a line, that first mission also looks in progress. |
+
+Everything after the first mission of a line is unaffected either way.
+
+**Which lines does this cover?** Only the ones added after Treasures of Aht Urhgan: Wings of the Goddess, Campaign,
+The Voracious Resurgence, A Shantotto Ascension, A Moogle Kupo d'Etat, A Crystalline Prophecy, Seekers of Adoulin and
+Rhapsodies of Vana'diel. The older lines (nation missions, Rise of the Zilart, Chains of Promathia, Treasures of Aht
+Urhgan, Assault) are left exactly as the original addon handled them, whatever this setting says. A 0 there can be real,
+so a character that has not started one of those lines may still see its first mission listed as accepted; if you see
+that on your own character, tell the port author which line.
+
+**How to tell you picked wrong:**
+- Off, on a server with the content: you accepted the first mission of a line, but it still shows a `!` and is missing from the questmarks-ui list until you finish it. Turn it **on**.
+- On, on a server without the content: missions like "Cavernous Maws" or "Smokescreen I (S)" appear in questmarks-ui as accepted. Turn it **off**.
+
+The setting is saved. `/qm expansions` with no argument shows the current value. **questmarks-ui** follows this
+same setting: after changing it, run `/qmui reload`.
+
+## Port fixes to the original logic
+- **v0.6.1 / v0.7.0:** a "current mission" value of 0 on the later-expansion lines used to be rounded up to the first
+  mission and reported as in progress, so characters that had never touched those lines saw e.g. "Cavernous Maws"
+  as accepted. It is now controlled by `/qm expansions` (above), default off.
