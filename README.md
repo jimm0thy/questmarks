@@ -1,6 +1,119 @@
-> **Ashita v4 port (branch `ashita`).** This branch is a port of questmarks to Ashita v4, by Semil. It keeps the
-> original quest logic and data and replaces the Windower platform layer. See [README_ASHITA.md](README_ASHITA.md) for
-> install and usage; the rest of this README describes the original Windower addon by DrNefarius and its `//qm` commands (`/qm` on Ashita).
+# questmarks: Ashita v4 port
+
+Ashita v4 port **v0.7.1** by **Semil** of **questmarks 1.0.0** by **DrNefarius** (Windower 4).
+Quest and mission logic, data and icons are the original's; only the platform layer changed. Tested on
+**HorizonXI** (content up to Treasures of Aht Urhgan), on Windows and on Linux/Proton.
+
+The Windower original's documentation follows the Ashita section, below the line, unchanged except that its
+`//qm` commands are `/qm` on Ashita. The companion quest-log browser is
+[questmarks-ui](https://github.com/jimm0thy/questmarks-ui).
+
+## Install (Ashita v4)
+
+Clone into your Ashita addons folder (this includes the `build/` folders the UI addon needs):
+
+```
+git clone https://github.com/jimm0thy/questmarks Ashita/addons/questmarks
+```
+
+or download the zip. The folder must be named `questmarks` (GitHub adds a suffix such as `-main`), with
+`questmarks.lua` directly inside it. Then in game: `/addon load questmarks`. Commands are `/qm` or `/questmarks`
+(Windower's `//qm` became `/qm`); `/qm` alone lists them all.
+
+- Requires Ashita v4's bundled `d3d8`, `imgui`, `ffi` and `bit` modules (all stock).
+- `tools/`, `bgwiki-rest-cache/` and the build pipeline are the original's developer tooling for Windower; the
+  Ashita port does not use them.
+- `build/rendered/` and `build/authored/` (with `tools/pipeline/lib/player_voice.json`) are read by
+  **questmarks-ui** for quest descriptions and step notes. A git checkout includes them; a zip may not. Without
+  them questmarks-ui still works, minus notes and descriptions. They are about 16 MB and never loaded by questmarks itself.
+- Keep questmarks loaded (ideally at login): it saves the last quest-log packets per character
+  (`qm_log_cache.lua`), which questmarks-ui replays if it is loaded mid-session instead of waiting for a zone.
+
+## Ashita port notes
+
+### How it was ported
+
+`compat.lua` is a Windower-shaped facade over Ashita's memory manager, so the ~2000 lines of logic in
+`questmarks.lua` and `core/` are unchanged. Platform-specific parts:
+
+| File | Job |
+|---|---|
+| `compat.lua` | `windower.ffxi.*` shims, scheduler, login/zone/job detection (polled per frame). Handler failures are logged 3 times, then every 5000th, so they can't flood disk or chat. It never starts a command shell in the game (`windower.no_shell`) and lists folders with `ashita.fs.get_dir` |
+| `qm_packets.lua` | decoders for 0x056 (quest/mission log), 0x055 (key items), 0x02D, 0x028 |
+| `qm_log_cache.lua` | saves the last quest-log packets per character, for late-loaded questmarks-ui |
+| `render/camera.lua` | reads view/projection matrices from the D3D8 device each frame |
+| `render/backend.lua` | loads PNGs with `D3DXCreateTextureFromFileA`, draws them with ImGui `AddImage` |
+| `render/project.lua`, `render/markers.lua` | original projection/marker code, re-pointed at the above |
+
+### `/qm expansions`: which server are you on?
+Mission lines that came with later expansions (Wings of the Goddess, Campaign, The Voracious Resurgence,
+A Shantotto Ascension, A Moogle Kupo d'Etat, A Crystalline Prophecy, Seekers of Adoulin, Rhapsodies of Vana'diel)
+report your progress as a single "current mission" number. The game sends **0** both for "never started" and for
+"on the first mission", and the two cannot be told apart. So the addon has to pick one reading:
+
+| Setting | Use it when | What a 0 means |
+|---|---|---|
+| `/qm expansions off` (**default**) | Your server does **not** have that content, e.g. HorizonXI (which goes up to Treasures of Aht Urhgan and has none of these) | "Not started". The first mission of those lines shows as *available* (a `!` over the NPC), never as in progress. |
+| `/qm expansions on` | Your server **does** have that content (Wings of the Goddess or later, e.g. a retail-like server) | "On the first mission". The first mission shows as *in progress* while you are on it, and appears in questmarks-ui. The cost: on a character that has **never started** a line, that first mission also looks in progress. |
+
+Everything after the first mission of a line is unaffected either way.
+
+**Which lines does this cover?** Only the ones added after Treasures of Aht Urhgan: Wings of the Goddess, Campaign,
+The Voracious Resurgence, A Shantotto Ascension, A Moogle Kupo d'Etat, A Crystalline Prophecy, Seekers of Adoulin and
+Rhapsodies of Vana'diel. The older lines (nation missions, Rise of the Zilart, Chains of Promathia, Treasures of Aht
+Urhgan, Assault) are left exactly as the original addon handled them, whatever this setting says. A 0 there can be real,
+so a character that has not started one of those lines may still see its first mission listed as accepted; if you see
+that on your own character, tell the port author which line.
+
+**How to tell you picked wrong:**
+- Off, on a server with the content: you accepted the first mission of a line, but it still shows a `!` and is missing from the questmarks-ui list until you finish it. Turn it **on**.
+- On, on a server without the content: missions like "Cavernous Maws" or "Smokescreen I (S)" appear in questmarks-ui as accepted. Turn it **off**.
+
+The setting is saved. `/qm expansions` with no argument shows the current value. **questmarks-ui** follows this
+same setting: after changing it, run `/qmui reload`.
+
+
+### Port fixes to the original logic
+- **v0.6.1 / v0.7.0:** a "current mission" value of 0 on the later-expansion lines used to be rounded up to the first
+  mission and reported as in progress, so characters that had never touched those lines saw e.g. "Cavernous Maws"
+  as accepted. It is now controlled by `/qm expansions` (above), default off.
+
+### What has and has not been verified
+
+Tested in game on **HorizonXI** (Ashita v4): markers draw above quest NPCs, `/qm selftest` shows over your head,
+`/qm axes 1 2 3` is correct (now the default), textures load, the quest state follows the server's 0x056 packets,
+`/qm expansions` works, and the saved quest log is replayed by questmarks-ui. Also run headlessly against mocks
+(packets, state, NPC scan, projection, draw calls).
+
+Not verified, so the first things to check if something looks off on another build or server:
+
+- **Camera matrices**: taken from `GetTransform` at `d3d_present`; the accessor is probed at runtime. `/qm probe` shows what was captured, the draw list used and any draw errors.
+- **"Spawned" test**: `/qm visible` uses render flag 0x200; if no markers show at all try `/qm visible off`.
+- **Packet layouts 0x02D / 0x028** (kill tracking) were written from memory; 0x056/0x055 follow the original's documented layout.
+- **Not available on Ashita:** Mog House detection and menu-open detection (treated as false).
+- Equipped-item detection (container Flags==5) is a guess; the `/qm hook pre|post` option is a no-op (Ashita has one render event).
+
+### Debugging
+
+`/qm probe` (camera, viewport, axes, candidates) · `/qm selftest` (tag over your own head) · `/qm axes` ·
+`/qm visible off` · `/qm lag 0` · `/qm diag` (full dump, also written to `questmarks.log`).
+
+Freezes seen on Linux/Proton while testing the companion addon were traced to Ashita itself (the Minimap plugin and
+the RetroAchievements addon, stack overflows inside `Ashita.dll`), not to questmarks or questmarks-ui. The
+questmarks-ui README lists the diagnostic switches (`/qmui blackbox`, `notex.flag`, `nodraw.flag`).
+
+### Tests
+
+`texlua tests/smoke_headless.lua` (or any Lua 5.3+) from this folder runs the mock-Ashita smoke test.
+
+### Licence
+
+Code: MIT (see `LICENSE`). Bundled quest data: CC BY-NC-SA 3.0 from BG Wiki (`LICENSE-DATA`);
+`data/dat_names.lua` contains Square Enix content (`NOTICE`). Original author credit: DrNefarius.
+
+---
+
+# Original documentation (Windower 4)
 
 # questmarks
 

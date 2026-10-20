@@ -2214,7 +2214,7 @@ extra_commands.probe = function()
 end
 
 --[[ `/qm axes 1 3 2` -- which raw Ashita position component feeds mob.x, mob.y, mob.z. ]]
---[[ `/qm expansions [on|off]` -- see README_ASHITA.md. ]]
+--[[ `/qm expansions [on|off]` -- see README.md. ]]
 extra_commands.expansions = function(a)
     if a == 'on' or a == 'off' then
         settings.later_expansions = (a == 'on')
