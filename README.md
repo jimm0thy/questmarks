@@ -10,13 +10,13 @@ The Windower original's documentation follows the Ashita section, below the line
 
 ## Install (Ashita v4)
 
-Clone into your Ashita addons folder (this includes the `build/` folders the UI addon needs):
+Clone `main` into your Ashita addons folder (this includes the `build/` folders the UI addon needs):
 
 ```
 git clone https://github.com/jimm0thy/questmarks Ashita/addons/questmarks
 ```
 
-or download the zip. The folder must be named `questmarks` (GitHub adds a suffix such as `-main`), with
+or download the latest zip from the [Releases](https://github.com/jimm0thy/questmarks/releases) page. The folder must be named `questmarks` (GitHub adds a suffix such as `-main`), with
 `questmarks.lua` directly inside it. Then in game: `/addon load questmarks`. Commands are `/qm` or `/questmarks`
 (Windower's `//qm` became `/qm`); `/qm` alone lists them all.
 
@@ -24,7 +24,7 @@ or download the zip. The folder must be named `questmarks` (GitHub adds a suffix
 - `tools/`, `bgwiki-rest-cache/` and the build pipeline are the original's developer tooling for Windower; the
   Ashita port does not use them.
 - `build/rendered/` and `build/authored/` (with `tools/pipeline/lib/player_voice.json`) are read by
-  **questmarks-ui** for quest descriptions and step notes. A git checkout includes them; a zip may not. Without
+  **questmarks-ui** for quest descriptions and step notes. A `main` checkout includes them; check that a release download does. Without
   them questmarks-ui still works, minus notes and descriptions. They are about 16 MB and never loaded by questmarks itself.
 - Keep questmarks loaded (ideally at login): it saves the last quest-log packets per character
   (`qm_log_cache.lua`), which questmarks-ui replays if it is loaded mid-session instead of waiting for a zone.
