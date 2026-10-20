@@ -24,7 +24,7 @@ or download the latest zip from the [Releases](https://github.com/jimm0thy/quest
 - `tools/`, `bgwiki-rest-cache/` and the build pipeline are the original's developer tooling for Windower; the
   Ashita port does not use them.
 - `build/rendered/` and `build/authored/` (with `tools/pipeline/lib/player_voice.json`) are read by
-  **questmarks-ui** for quest descriptions and step notes. A `main` checkout includes them; check that a release download does. Without
+  **questmarks-ui** for quest descriptions and step notes. Both a `main` checkout and a release download include them. Without
   them questmarks-ui still works, minus notes and descriptions. They are about 16 MB and never loaded by questmarks itself.
 - Keep questmarks loaded (ideally at login): it saves the last quest-log packets per character
   (`qm_log_cache.lua`), which questmarks-ui replays if it is loaded mid-session instead of waiting for a zone.
