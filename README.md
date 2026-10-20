@@ -1,6 +1,6 @@
 # questmarks: Ashita v4 port
 
-Ashita v4 port **v0.7.1** by **Semil** of **questmarks 1.0.0** by **DrNefarius** (Windower 4).
+Ashita v4 port **v0.7.1** by **Semil (Vibe Coded with Claude)** of **questmarks 1.0.0** by **DrNefarius** (Windower 4).
 Quest and mission logic, data and icons are the original's; only the platform layer changed. Tested on
 **HorizonXI** (content up to Treasures of Aht Urhgan), on Windows and on Linux/Proton.
 
