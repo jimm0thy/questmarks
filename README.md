@@ -26,6 +26,7 @@ or download the latest zip from the [Releases](https://github.com/jimm0thy/quest
 - `build/rendered/` and `build/authored/` (with `tools/pipeline/lib/player_voice.json`) are read by
   **questmarks-ui** for quest descriptions and step notes. Both a `main` checkout and a release download include them. Without
   them questmarks-ui still works, minus notes and descriptions. They are about 16 MB and never loaded by questmarks itself.
+- Saved data lives in `Ashita/config/addons/questmarks/` (`qm_settings_data.lua`, `qm_log_cache.lua`), not in the addon folder, so updating or re-extracting the addon doesn't reset it. Files from an older version in the addon folder are copied over automatically.
 - Keep questmarks loaded (ideally at login): it saves the last quest-log packets per character
   (`qm_log_cache.lua`), which questmarks-ui replays if it is loaded mid-session instead of waiting for a zone.
 

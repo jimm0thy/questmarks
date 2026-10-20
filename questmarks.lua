@@ -35,7 +35,7 @@ addon.link     = 'https://github.com/'
      so during a multi-day test a single file holds several builds, and a line
      without a version is a line you cannot attribute. ]]
 -- Two version numbers: the port's own, and the Windower release it was ported from.
-local PORT_VERSION     = '0.7.1'   -- Ashita port by Semil; bump on every port change
+local PORT_VERSION     = '0.7.2'   -- Ashita port by Semil; bump on every port change
 local ORIGINAL_VERSION = '1.0.0'   -- questmarks by DrNefarius (Windower 4) this is based on
 addon.version  = PORT_VERSION
 -- Commands: /qm and /questmarks (was /qm under Windower).
@@ -46,7 +46,7 @@ local flog     = compat.flog
 local asettings = require('qm_settings')    -- own settings store (Ashita's `settings` lib differs between builds)
 local packets  = require('qm_packets')
 local logcache = require('qm_logcache')
-logcache.set_path((addon and addon.path or './') .. 'qm_log_cache.lua')      -- raw-packet decoders (replaces Windower's packets lib)
+logcache.set_path(require('qm_cfgdir').path('questmarks', 'qm_log_cache.lua', addon and addon.path or './'))      -- raw-packet decoders (replaces Windower's packets lib)
 
 -- Slash form is what works under Windower's Lua. Do not mix with dot form:
 -- Lua would treat them as separate modules and load each one twice, giving
